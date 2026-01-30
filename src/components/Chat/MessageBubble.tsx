@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import { User, Bot, CheckCircle, AlertCircle, Info } from 'lucide-react';
-import { Message } from '../../types';
+import type { Message } from '../../types';
 
 interface MessageBubbleProps {
   message: Message;

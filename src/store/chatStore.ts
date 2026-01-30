@@ -1,6 +1,17 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import { Message, Conversation, ProspectInfo, QualificationStatus, ChatState, BrandConfig } from '../types';
+import type { 
+  Message, 
+  Conversation, 
+  ProspectInfo, 
+  QualificationStatus, 
+  BrandConfig, 
+  SalesRep,
+  AvailabilityStatus,
+  HandoffConfig
+} from '../types';
+import { qualificationService } from '../services/qualificationService';
+import { handoffService } from '../services/handoffService';
 
 interface ChatStore {
   // State
@@ -8,20 +19,28 @@ interface ChatStore {
   isTyping: boolean;
   isQualified: boolean;
   showConnectOption: boolean;
-  availabilityStatus: 'online' | 'offline' | 'busy';
+  availabilityStatus: AvailabilityStatus;
+  assignedRep: SalesRep | null;
+  handoffConfig: HandoffConfig | null;
   brandConfig: BrandConfig | null;
   
   // Actions
   addMessage: (content: string, role: 'user' | 'assistant', metadata?: Message['metadata']) => void;
   updateProspectInfo: (info: Partial<ProspectInfo>) => void;
   updateQualificationStatus: (status: Partial<QualificationStatus>) => void;
+  processQualificationFromMessages: () => Promise<void>;
+  checkRepAvailability: () => Promise<void>;
+  initiateHandoff: () => Promise<boolean>;
   setTyping: (typing: boolean) => void;
   setBrandConfig: (config: BrandConfig) => void;
+  setHandoffConfig: (config: HandoffConfig) => void;
+  setAssignedRep: (rep: SalesRep | null) => void;
   clearConversation: () => void;
   
   // Computed
   getQualificationScore: () => number;
   isReadyToConnect: () => boolean;
+  canTalkNow: () => boolean;
 }
 
 const initialProspect: ProspectInfo = {
@@ -29,13 +48,11 @@ const initialProspect: ProspectInfo = {
   painPoints: [],
 };
 
-const initialQualification: QualificationStatus = {
-  budget: 'unknown',
-  authority: 'unknown', 
-  need: 'unknown',
-  timeline: 'unknown',
-  score: 0,
-  readyToConnect: false,
+const initialQualification: QualificationStatus = qualificationService.initializeQualificationStatus();
+
+const initialAvailability: AvailabilityStatus = {
+  status: 'offline',
+  lastUpdated: new Date()
 };
 
 const initialConversation: Conversation = {
@@ -54,7 +71,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   isTyping: false,
   isQualified: false,
   showConnectOption: false,
-  availabilityStatus: 'online',
+  availabilityStatus: initialAvailability,
+  assignedRep: null,
+  handoffConfig: null,
   brandConfig: null,
   
   // Actions
@@ -74,11 +93,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         updatedAt: new Date(),
       },
     }));
-    
-    // Auto-update qualification based on message content
-    if (role === 'user' && metadata?.type === 'qualification') {
-      get().updateQualificationFromMessage(content, metadata);
-    }
   },
   
   updateProspectInfo: (info: Partial<ProspectInfo>) => {
@@ -101,16 +115,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         ...status,
       };
       
-      // Calculate score
-      const qualifiedCount = [
-        newQualificationStatus.budget,
-        newQualificationStatus.authority,
-        newQualificationStatus.need,
-        newQualificationStatus.timeline,
-      ].filter(s => s === 'qualified').length;
-      
-      newQualificationStatus.score = (qualifiedCount / 4) * 100;
-      newQualificationStatus.readyToConnect = newQualificationStatus.score >= 75;
+      // Calculate score using the qualification service
+      newQualificationStatus.score = qualificationService.calculateScore(newQualificationStatus);
+      newQualificationStatus.readyToConnect = newQualificationStatus.score >= (state.handoffConfig?.scoreThresholdForHandoff || 75);
       
       return {
         conversation: {
@@ -123,6 +130,90 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       };
     });
   },
+
+  processQualificationFromMessages: async () => {
+    const state = get();
+    try {
+      const updatedStatus = await qualificationService.assessQualificationFromMessages(
+        state.conversation.messages,
+        state.conversation.qualificationStatus
+      );
+      
+      get().updateQualificationStatus(updatedStatus);
+      
+      // Check if we should trigger handoff
+      if (updatedStatus.readyToConnect && state.handoffConfig?.enableSlackNotifications) {
+        // Send Slack notification for qualified lead
+        setTimeout(() => {
+          handoffService.sendSlackNotification(get().conversation);
+        }, 1000); // Small delay to ensure state is updated
+      }
+    } catch (error) {
+      console.error('Failed to process qualification:', error);
+    }
+  },
+
+  checkRepAvailability: async () => {
+    const state = get();
+    if (!state.assignedRep) {
+      // Try to get the best available rep
+      try {
+        const repResult = await handoffService.getBestAvailableRep();
+        if (repResult) {
+          set({
+            assignedRep: repResult.rep,
+            availabilityStatus: repResult.availability
+          });
+        } else {
+          set({
+            availabilityStatus: {
+              status: 'offline',
+              lastUpdated: new Date()
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Failed to check rep availability:', error);
+      }
+    } else {
+      // Check specific rep availability
+      try {
+        const availability = await handoffService.getRepAvailability(state.assignedRep.id);
+        set({ availabilityStatus: availability });
+      } catch (error) {
+        console.error('Failed to check assigned rep availability:', error);
+      }
+    }
+  },
+
+  initiateHandoff: async () => {
+    const state = get();
+    try {
+      // Send Slack notification
+      const notificationSent = await handoffService.sendSlackNotification(state.conversation);
+      
+      if (notificationSent) {
+        // Update UI to show handoff initiated
+        set({
+          showConnectOption: false,
+          isTyping: true
+        });
+        
+        // Add a message about the handoff
+        get().addMessage(
+          "Great! I've notified our sales team about your interest. A team member will be in touch shortly to continue the conversation.",
+          'assistant'
+        );
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Failed to initiate handoff:', error);
+      return false;
+    }
+  },
   
   setTyping: (typing: boolean) => {
     set({ isTyping: typing });
@@ -134,6 +225,15 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     document.documentElement.style.setProperty('--primary-500', config.branding.colors.primary);
     document.documentElement.style.setProperty('--secondary-500', config.branding.colors.secondary);
     document.documentElement.style.setProperty('--accent-500', config.branding.colors.accent);
+  },
+
+  setHandoffConfig: (config: HandoffConfig) => {
+    set({ handoffConfig: config });
+    handoffService.updateConfig(config);
+  },
+
+  setAssignedRep: (rep: SalesRep | null) => {
+    set({ assignedRep: rep });
   },
   
   clearConversation: () => {
@@ -157,45 +257,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   isReadyToConnect: () => {
     return get().conversation.qualificationStatus.readyToConnect;
   },
-  
-  // Helper methods (not part of the store interface but useful)
-  updateQualificationFromMessage: (content: string, metadata?: Message['metadata']) => {
-    const lowerContent = content.toLowerCase();
-    const updates: Partial<QualificationStatus> = {};
-    
-    // Budget qualification patterns
-    if (lowerContent.includes('budget') || lowerContent.includes('price') || lowerContent.includes('cost')) {
-      if (lowerContent.includes('approved') || lowerContent.includes('allocated') || /\$[\d,]+/.test(content)) {
-        updates.budget = 'qualified';
-      } else if (lowerContent.includes('no budget') || lowerContent.includes("can't afford")) {
-        updates.budget = 'unqualified';
-      }
-    }
-    
-    // Authority qualification patterns
-    if (lowerContent.includes('decision') || lowerContent.includes('approve')) {
-      if (lowerContent.includes('i make') || lowerContent.includes('i decide') || lowerContent.includes('i approve')) {
-        updates.authority = 'qualified';
-      } else if (lowerContent.includes('need to check') || lowerContent.includes('boss') || lowerContent.includes('team decision')) {
-        updates.authority = 'unqualified';
-      }
-    }
-    
-    // Need qualification patterns
-    if (lowerContent.includes('problem') || lowerContent.includes('issue') || lowerContent.includes('challenge')) {
-      updates.need = 'qualified';
-    }
-    
-    // Timeline qualification patterns
-    if (lowerContent.includes('asap') || lowerContent.includes('urgent') || lowerContent.includes('this week') || lowerContent.includes('this month')) {
-      updates.timeline = 'qualified';
-    } else if (lowerContent.includes('next year') || lowerContent.includes('maybe later') || lowerContent.includes('not urgent')) {
-      updates.timeline = 'unqualified';
-    }
-    
-    if (Object.keys(updates).length > 0) {
-      get().updateQualificationStatus(updates);
-    }
+
+  canTalkNow: () => {
+    const state = get();
+    return state.isReadyToConnect() && 
+           state.availabilityStatus.status === 'available' &&
+           state.handoffConfig?.enableTalkNow === true;
   },
 }));
 
@@ -205,3 +272,7 @@ export const useProspectInfo = () => useChatStore(state => state.conversation.pr
 export const useQualificationStatus = () => useChatStore(state => state.conversation.qualificationStatus);
 export const useIsTyping = () => useChatStore(state => state.isTyping);
 export const useBrandConfig = () => useChatStore(state => state.brandConfig);
+export const useAvailabilityStatus = () => useChatStore(state => state.availabilityStatus);
+export const useAssignedRep = () => useChatStore(state => state.assignedRep);
+export const useHandoffConfig = () => useChatStore(state => state.handoffConfig);
+export const useCanTalkNow = () => useChatStore(state => state.canTalkNow());

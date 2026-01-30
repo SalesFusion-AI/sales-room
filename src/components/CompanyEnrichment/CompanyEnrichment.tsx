@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Building2, Globe, MapPin, Users, DollarSign, Calendar, ExternalLink } from 'lucide-react';
 import { useChatStore, useProspectInfo } from '../../store/chatStore';
-import { CompanyEnrichmentData } from '../../types';
+import type { CompanyEnrichmentData } from '../../types';
 
 const CompanyEnrichment: React.FC = () => {
   const { updateProspectInfo, addMessage } = useChatStore();

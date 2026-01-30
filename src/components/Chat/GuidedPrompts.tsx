@@ -1,6 +1,6 @@
 import React from 'react';
-import { MessageSquare, DollarSign, Zap, HelpCircle, Building, Calendar } from 'lucide-react';
-import { GuidedPrompt } from '../../types';
+import { MessageSquare, DollarSign, Zap, HelpCircle, Calendar } from 'lucide-react';
+import type { GuidedPrompt } from '../../types';
 
 interface GuidedPromptsProps {
   onPromptClick: (promptText: string) => void;

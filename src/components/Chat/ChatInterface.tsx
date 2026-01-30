@@ -1,9 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import { Send, Loader2 } from 'lucide-react';
-import { useChatStore, useMessages, useIsTyping } from '../../store/chatStore';
+import { useChatStore, useMessages, useIsTyping, useQualificationStatus } from '../../store/chatStore';
 import MessageBubble from './MessageBubble';
 import TypingIndicator from './TypingIndicator';
 import GuidedPrompts from './GuidedPrompts';
+import TalkNowButton from '../Connect/TalkNowButton';
 
 interface ChatInterfaceProps {
   className?: string;
@@ -12,7 +13,8 @@ interface ChatInterfaceProps {
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ className = '' }) => {
   const messages = useMessages();
   const isTyping = useIsTyping();
-  const { addMessage, setTyping } = useChatStore();
+  const qualificationStatus = useQualificationStatus();
+  const { addMessage, setTyping, processQualificationFromMessages } = useChatStore();
   
   const [inputValue, setInputValue] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -49,6 +51,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className = '' }) => {
     try {
       // Simulate AI response (will be replaced with actual AI integration)
       await simulateAIResponse(userMessage);
+      
+      // Process qualification after AI response
+      await processQualificationFromMessages();
     } catch (error) {
       console.error('Failed to get AI response:', error);
       addMessage('I apologize, but I\'m having trouble responding right now. Please try again.', 'assistant');
@@ -138,6 +143,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className = '' }) => {
         {isTyping && <TypingIndicator />}
         <div ref={messagesEndRef} />
       </div>
+      
+      {/* Talk Now Button */}
+      {messages.length > 0 && qualificationStatus.score > 0 && (
+        <div className="px-4 pb-2">
+          <TalkNowButton />
+        </div>
+      )}
       
       {/* Guided Prompts */}
       {shouldShowGuidedPrompts && (

@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrandConfig } from '../../types';
+import type { BrandConfig } from '../../types';
 
 interface HeaderProps {
   brandConfig: BrandConfig;

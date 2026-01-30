@@ -33,7 +33,7 @@ export interface ProspectInfo {
   phone?: string;
   industry?: string;
   companySize?: string;
-  pain points?: string[];
+  painPoints?: string[];
   budget?: string;
   timeline?: string;
   decisionMaker?: boolean;
@@ -62,14 +62,38 @@ export interface CompanyEnrichmentData {
   }>;
 }
 
+export interface QualificationCriterion {
+  id: string;
+  name: string;
+  description: string;
+  weight: number; // 0-1 (relative importance)
+  status: 'qualified' | 'unqualified' | 'unknown';
+  confidence: number; // 0-1 (AI confidence in this assessment)
+  evidence?: string[]; // Messages/responses that led to this assessment
+}
+
+export interface QualificationSchema {
+  id: string;
+  name: string;
+  criteria: QualificationCriterion[];
+  scoreThreshold: number; // Minimum score (0-100) to be "ready to connect"
+  customFields?: {
+    [key: string]: any;
+  };
+}
+
 export interface QualificationStatus {
-  budget: 'qualified' | 'unqualified' | 'unknown';
-  authority: 'qualified' | 'unqualified' | 'unknown';
-  need: 'qualified' | 'unqualified' | 'unknown';
-  timeline: 'qualified' | 'unqualified' | 'unknown';
-  score: number; // 0-100
+  schemaId: string;
+  criteria: Record<string, QualificationCriterion>; // criterion id -> criterion
+  score: number; // 0-100 weighted score
   readyToConnect: boolean;
+  lastUpdated: Date;
   notes?: string;
+  aiAssessment?: {
+    summary: string;
+    confidence: number;
+    nextQuestions?: string[];
+  };
 }
 
 export interface KnowledgeBase {
@@ -174,17 +198,79 @@ export interface GuidedPrompt {
   priority: number;
 }
 
+// Availability and Handoff Types
+export interface SalesRep {
+  id: string;
+  name: string;
+  title: string;
+  email: string;
+  avatar?: string;
+  slackUserId?: string;
+  calendarUrl?: string; // Calendly/Cal.com link
+  timezone: string;
+  isActive: boolean;
+}
+
+export interface AvailabilityStatus {
+  status: 'available' | 'busy' | 'offline';
+  nextAvailable?: Date;
+  currentMeeting?: {
+    title: string;
+    endTime: Date;
+  };
+  lastUpdated: Date;
+}
+
+export interface HandoffConfig {
+  enableTalkNow: boolean;
+  enableSlackNotifications: boolean;
+  slackConfig?: {
+    channel: string; // Channel ID or name
+    mentionUsers?: string[]; // User IDs to ping
+    webhookUrl?: string;
+  };
+  availabilitySources: ('calendar' | 'slack' | 'manual')[];
+  defaultCalendarUrl?: string; // Fallback booking link
+  scoreThresholdForHandoff: number; // 0-100
+  businessHours?: {
+    timezone: string;
+    days: {
+      monday: { start: string; end: string; enabled: boolean };
+      tuesday: { start: string; end: string; enabled: boolean };
+      wednesday: { start: string; end: string; enabled: boolean };
+      thursday: { start: string; end: string; enabled: boolean };
+      friday: { start: string; end: string; enabled: boolean };
+      saturday: { start: string; end: string; enabled: boolean };
+      sunday: { start: string; end: string; enabled: boolean };
+    };
+  };
+}
+
+export interface SlackNotification {
+  lead: {
+    name?: string;
+    email?: string;
+    company?: string;
+    score: number;
+  };
+  conversation: {
+    summary: string;
+    keyPoints: string[];
+    painPoints: string[];
+    qualificationDetails: Record<string, any>;
+  };
+  urgency: 'low' | 'medium' | 'high';
+  sessionUrl?: string;
+}
+
 export interface ChatState {
   conversation: Conversation;
   isTyping: boolean;
   isQualified: boolean;
   showConnectOption: boolean;
-  availabilityStatus: 'online' | 'offline' | 'busy';
-  repInfo?: {
-    name: string;
-    title: string;
-    avatar?: string;
-  };
+  availabilityStatus: AvailabilityStatus;
+  assignedRep?: SalesRep;
+  handoffConfig?: HandoffConfig;
 }
 
 export interface AIResponse {
@@ -225,6 +311,15 @@ export interface SalesRoomConfig {
 }
 
 export type MessageType = 'text' | 'rich' | 'options' | 'form' | 'pricing' | 'connect';
+
+export interface FormField {
+  id: string;
+  type: 'text' | 'email' | 'tel' | 'select' | 'textarea';
+  label: string;
+  placeholder?: string;
+  required?: boolean;
+  options?: string[];
+}
 
 export interface RichMessage extends Message {
   type: MessageType;

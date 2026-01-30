@@ -1,11 +1,12 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import ChatInterface from './components/Chat/ChatInterface';
 import Header from './components/Layout/Header';
 import CompanyEnrichment from './components/CompanyEnrichment/CompanyEnrichment';
 import QualificationStatus from './components/Qualification/QualificationStatus';
 import ConnectNow from './components/Connect/ConnectNow';
 import { useChatStore, useQualificationStatus, useBrandConfig } from './store/chatStore';
-import { BrandConfig } from './types';
+import { handoffService } from './services/handoffService';
+import type { BrandConfig, HandoffConfig, SalesRep } from './types';
 
 // Demo brand configuration - would come from API based on client
 const DEMO_BRAND_CONFIG: BrandConfig = {
@@ -39,14 +40,68 @@ const DEMO_BRAND_CONFIG: BrandConfig = {
   },
 };
 
+// Demo handoff configuration
+const DEMO_HANDOFF_CONFIG: HandoffConfig = {
+  enableTalkNow: true,
+  enableSlackNotifications: true,
+  slackConfig: {
+    channel: '#sales-leads',
+    mentionUsers: ['USLACKID123'], // Replace with real Slack user IDs
+    webhookUrl: 'https://hooks.slack.com/services/your/webhook/url', // Replace with real webhook
+  },
+  availabilitySources: ['calendar', 'slack', 'manual'],
+  defaultCalendarUrl: 'https://calendly.com/your-team/15min',
+  scoreThresholdForHandoff: 75,
+  businessHours: {
+    timezone: 'America/New_York',
+    days: {
+      monday: { start: '09:00', end: '17:00', enabled: true },
+      tuesday: { start: '09:00', end: '17:00', enabled: true },
+      wednesday: { start: '09:00', end: '17:00', enabled: true },
+      thursday: { start: '09:00', end: '17:00', enabled: true },
+      friday: { start: '09:00', end: '17:00', enabled: true },
+      saturday: { start: '10:00', end: '14:00', enabled: false },
+      sunday: { start: '10:00', end: '14:00', enabled: false }
+    }
+  }
+};
+
+// Demo sales reps - would come from API/CRM
+const DEMO_SALES_REPS: SalesRep[] = [
+  {
+    id: 'rep-1',
+    name: 'Sarah Johnson',
+    title: 'Senior Sales Consultant',
+    email: 'sarah.j@company.com',
+    slackUserId: 'USLACK123',
+    calendarUrl: 'https://calendly.com/sarah-j/15min',
+    timezone: 'America/New_York',
+    isActive: true,
+  },
+  {
+    id: 'rep-2', 
+    name: 'Michael Chen',
+    title: 'Sales Executive',
+    email: 'michael.c@company.com',
+    slackUserId: 'USLACK456',
+    calendarUrl: 'https://calendly.com/michael-c/15min',
+    timezone: 'America/New_York',
+    isActive: true,
+  }
+];
+
 function App() {
-  const { setBrandConfig, addMessage } = useChatStore();
+  const { setBrandConfig, addMessage, setHandoffConfig } = useChatStore();
   const qualificationStatus = useQualificationStatus();
   const brandConfig = useBrandConfig();
   
   useEffect(() => {
     // Initialize with demo brand config
     setBrandConfig(DEMO_BRAND_CONFIG);
+    
+    // Initialize handoff configuration
+    setHandoffConfig(DEMO_HANDOFF_CONFIG);
+    handoffService.updateReps(DEMO_SALES_REPS);
     
     // Add welcome message
     setTimeout(() => {
@@ -56,7 +111,7 @@ function App() {
         { type: 'general' }
       );
     }, 500);
-  }, [setBrandConfig, addMessage]);
+  }, [setBrandConfig, addMessage, setHandoffConfig]);
   
   if (!brandConfig) {
     return (
