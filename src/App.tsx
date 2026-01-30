@@ -1,14 +1,20 @@
 import { useEffect, useState } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import ChatInterface from './components/Chat/ChatInterface';
 import Header from './components/Layout/Header';
 import Navigation from './components/Layout/Navigation';
+import LoadingState from './components/Layout/LoadingState';
+import ErrorBoundary from './components/Layout/ErrorBoundary';
 import CompanyEnrichment from './components/CompanyEnrichment/CompanyEnrichment';
 import QualificationStatus from './components/Qualification/QualificationStatus';
 import ConnectNow from './components/Connect/ConnectNow';
 import TranscriptList from './components/Transcript/TranscriptList';
+import AnalyticsDashboard from './components/Analytics/AnalyticsDashboard';
+import OnboardingWizard from './components/Onboarding/OnboardingWizard';
 import { useChatStore, useQualificationStatus, useBrandConfig, useHasUnsavedChanges } from './store/chatStore';
 import { handoffService } from './services/handoffService';
 import { crmService } from './services/crmService';
+import { demoService } from './demo/demoService';
 import type { BrandConfig, HandoffConfig, SalesRep } from './types';
 
 // Demo brand configuration - would come from API based on client
@@ -107,34 +113,65 @@ function App() {
   
   const [currentView, setCurrentView] = useState<'chat' | 'transcripts' | 'analytics' | 'settings'>('chat');
   const [prospectEmail, setProspectEmail] = useState<string>('');
+  const [demoInitialized, setDemoInitialized] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [initError, setInitError] = useState<string | null>(null);
   
   useEffect(() => {
-    // Initialize with demo brand config
-    setBrandConfig(DEMO_BRAND_CONFIG);
-    
-    // Initialize handoff configuration
-    setHandoffConfig(DEMO_HANDOFF_CONFIG);
-    handoffService.updateReps(DEMO_SALES_REPS);
-    
-    // Initialize CRM service
-    crmService.updateConfig({
-      provider: 'custom',
-      autoSync: true,
-      syncTriggers: ['qualified', 'handoff'],
-      baseUrl: 'https://api.example.com/crm', // Demo URL
-    });
-    
-    // Check for returning prospect via URL params
-    const urlParams = new URLSearchParams(window.location.search);
-    const email = urlParams.get('email');
-    const sessionId = urlParams.get('session');
-    
-    if (email) {
-      setProspectEmail(email);
-      // Try to continue existing conversation
-      continueConversationByEmail(email).then(found => {
-        if (!found) {
-          // New prospect, add welcome message
+    const initializeApp = async () => {
+      try {
+        setIsInitializing(true);
+        setInitError(null);
+
+        // Initialize with demo brand config
+        setBrandConfig(DEMO_BRAND_CONFIG);
+        
+        // Initialize handoff configuration
+        setHandoffConfig(DEMO_HANDOFF_CONFIG);
+        handoffService.updateReps(DEMO_SALES_REPS);
+        
+        // Initialize CRM service
+        crmService.updateConfig({
+          provider: 'custom',
+          autoSync: true,
+          syncTriggers: ['qualified', 'handoff'],
+          baseUrl: 'https://api.example.com/crm', // Demo URL
+        });
+
+        // Check if we should auto-initialize demo (for webinar)
+        const urlParams = new URLSearchParams(window.location.search);
+        const isDemoMode = urlParams.get('demo') === 'true' || window.location.hostname.includes('demo');
+        
+        if (isDemoMode) {
+          try {
+            await demoService.initializeDemoEnvironment();
+            setDemoInitialized(true);
+            console.log('🎬 Demo environment ready for webinar!');
+          } catch (error) {
+            console.error('Failed to initialize demo:', error);
+            setInitError('Demo initialization failed');
+          }
+        }
+        
+        // Check for returning prospect via URL params
+        const email = urlParams.get('email');
+        
+        if (email) {
+          setProspectEmail(email);
+          // Try to continue existing conversation
+          const found = await continueConversationByEmail(email);
+          if (!found) {
+            // New prospect, add welcome message
+            setTimeout(() => {
+              addMessage(
+                DEMO_BRAND_CONFIG.messaging.welcomeMessage,
+                'assistant',
+                { type: 'general' }
+              );
+            }, 500);
+          }
+        } else {
+          // Add welcome message for new session
           setTimeout(() => {
             addMessage(
               DEMO_BRAND_CONFIG.messaging.welcomeMessage,
@@ -143,17 +180,16 @@ function App() {
             );
           }, 500);
         }
-      });
-    } else {
-      // Add welcome message for new session
-      setTimeout(() => {
-        addMessage(
-          DEMO_BRAND_CONFIG.messaging.welcomeMessage,
-          'assistant',
-          { type: 'general' }
-        );
-      }, 500);
-    }
+        
+      } catch (error) {
+        console.error('Failed to initialize app:', error);
+        setInitError('Application initialization failed');
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+
+    initializeApp();
     
     // Auto-save on page unload
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -166,12 +202,41 @@ function App() {
     
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [setBrandConfig, addMessage, setHandoffConfig, continueConversationByEmail, hasUnsavedChanges, saveTranscript]);
+  }, []);
   
-  if (!brandConfig) {
+  // Show loading state during initialization
+  if (isInitializing || !brandConfig) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
+      <div className="min-h-screen bg-gray-50">
+        <LoadingState 
+          type="default" 
+          message={demoInitialized ? "Setting up demo environment..." : "Initializing Sales Room..."}
+          showProgress={demoInitialized}
+          progress={demoInitialized ? 85 : 45}
+        />
+      </div>
+    );
+  }
+
+  // Show error state if initialization failed
+  if (initError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="w-8 h-8 text-red-600" />
+            </div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Initialization Error</h2>
+            <p className="text-sm text-gray-600 mb-4">{initError}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -183,30 +248,10 @@ function App() {
         return <TranscriptList showViewer={true} />;
       
       case 'analytics':
-        return (
-          <div className="max-w-4xl mx-auto p-6">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Analytics Dashboard</h1>
-            <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-              <p className="text-gray-600">Analytics dashboard coming in Sprint 10!</p>
-              <p className="text-sm text-gray-500 mt-2">
-                This will include conversation metrics, qualification trends, and conversion rates.
-              </p>
-            </div>
-          </div>
-        );
+        return <AnalyticsDashboard />;
       
       case 'settings':
-        return (
-          <div className="max-w-4xl mx-auto p-6">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Settings</h1>
-            <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-              <p className="text-gray-600">Configuration settings coming in Sprint 10!</p>
-              <p className="text-sm text-gray-500 mt-2">
-                Customize qualification criteria, CRM integration, and notification preferences.
-              </p>
-            </div>
-          </div>
-        );
+        return <OnboardingWizard />;
         
       default: // 'chat'
         return (
@@ -297,21 +342,44 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar Navigation */}
-      <Navigation currentView={currentView} onViewChange={setCurrentView} />
-      
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col lg:ml-0">
-        {/* Header with branding */}
-        <Header brandConfig={brandConfig} />
+    <ErrorBoundary>
+      <div className="min-h-screen bg-gray-50 flex">
+        {/* Sidebar Navigation */}
+        <Navigation currentView={currentView} onViewChange={setCurrentView} />
         
-        {/* Current View Content */}
-        <div className="flex-1 overflow-auto">
-          {renderCurrentView()}
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col lg:ml-0">
+          {/* Header with branding */}
+          <Header brandConfig={brandConfig} />
+          
+          {/* Demo Mode Indicator */}
+          {demoInitialized && (
+            <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-2">
+              <div className="max-w-7xl mx-auto flex items-center justify-between text-sm">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                  <span className="font-medium">🎬 DEMO MODE ACTIVE</span>
+                  <span className="opacity-75">- Ready for Feb 21 webinar presentation</span>
+                </div>
+                <button
+                  onClick={() => demoService.startWebinar()}
+                  className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-md transition-colors"
+                >
+                  Start Webinar Mode
+                </button>
+              </div>
+            </div>
+          )}
+          
+          {/* Current View Content */}
+          <div className="flex-1 overflow-auto">
+            <ErrorBoundary>
+              {renderCurrentView()}
+            </ErrorBoundary>
+          </div>
         </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }
 

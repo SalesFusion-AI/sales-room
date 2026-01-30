@@ -1,0 +1,184 @@
+import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { AlertTriangle, RefreshCw, Home, MessageSquare } from 'lucide-react';
+
+interface Props {
+  children: ReactNode;
+  fallback?: ReactNode;
+}
+
+interface State {
+  hasError: boolean;
+  error: Error | null;
+  errorInfo: ErrorInfo | null;
+}
+
+class ErrorBoundary extends Component<Props, State> {
+  public state: State = {
+    hasError: false,
+    error: null,
+    errorInfo: null
+  };
+
+  public static getDerivedStateFromError(error: Error): State {
+    return {
+      hasError: true,
+      error,
+      errorInfo: null
+    };
+  }
+
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Error caught by ErrorBoundary:', error, errorInfo);
+    
+    this.setState({
+      error,
+      errorInfo
+    });
+
+    // In production, you'd send this to an error reporting service
+    if (process.env.NODE_ENV === 'production') {
+      // reportError(error, errorInfo);
+    }
+  }
+
+  private handleRefresh = () => {
+    this.setState({
+      hasError: false,
+      error: null,
+      errorInfo: null
+    });
+    window.location.reload();
+  };
+
+  private handleGoHome = () => {
+    this.setState({
+      hasError: false,
+      error: null,
+      errorInfo: null
+    });
+    window.location.href = '/';
+  };
+
+  private handleReportError = () => {
+    const { error, errorInfo } = this.state;
+    const errorData = {
+      error: error?.toString(),
+      stack: error?.stack,
+      componentStack: errorInfo?.componentStack,
+      timestamp: new Date().toISOString(),
+      userAgent: navigator.userAgent,
+      url: window.location.href
+    };
+
+    // Copy error data to clipboard for easy reporting
+    navigator.clipboard.writeText(JSON.stringify(errorData, null, 2))
+      .then(() => {
+        alert('Error details copied to clipboard. Please send this to our support team.');
+      })
+      .catch(() => {
+        console.error('Failed to copy error details');
+      });
+  };
+
+  public render() {
+    if (this.state.hasError) {
+      // Custom fallback UI
+      if (this.props.fallback) {
+        return this.props.fallback;
+      }
+
+      // Default error UI
+      return (
+        <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+          <div className="sm:mx-auto sm:w-full sm:max-w-md">
+            <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+              <div className="text-center">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                  <AlertTriangle className="h-6 w-6 text-red-600" />
+                </div>
+                
+                <h2 className="text-lg font-medium text-gray-900 mb-2">
+                  Something went wrong
+                </h2>
+                
+                <p className="text-sm text-gray-600 mb-6">
+                  We encountered an unexpected error. This has been logged and our team will investigate.
+                </p>
+
+                {/* Error details for development */}
+                {process.env.NODE_ENV === 'development' && this.state.error && (
+                  <div className="mb-6 text-left">
+                    <details className="bg-red-50 border border-red-200 rounded p-3">
+                      <summary className="text-sm font-medium text-red-800 cursor-pointer">
+                        Error Details
+                      </summary>
+                      <div className="mt-2 text-xs text-red-700 font-mono whitespace-pre-wrap break-all">
+                        {this.state.error.toString()}
+                        {this.state.error.stack && (
+                          <div className="mt-2 border-t border-red-200 pt-2">
+                            {this.state.error.stack}
+                          </div>
+                        )}
+                      </div>
+                    </details>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  <button
+                    onClick={this.handleRefresh}
+                    className="w-full flex justify-center items-center space-x-2 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    <span>Refresh Page</span>
+                  </button>
+                  
+                  <button
+                    onClick={this.handleGoHome}
+                    className="w-full flex justify-center items-center space-x-2 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                  >
+                    <Home className="h-4 w-4" />
+                    <span>Go to Home</span>
+                  </button>
+
+                  <button
+                    onClick={this.handleReportError}
+                    className="w-full flex justify-center items-center space-x-2 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    <span>Report Issue</span>
+                  </button>
+                </div>
+
+                <div className="mt-6 text-xs text-gray-500">
+                  <p>If this problem persists, please contact support.</p>
+                  <p className="mt-1">Error ID: {Date.now()}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// Higher-order component for easier usage
+export const withErrorBoundary = <P extends object>(
+  Component: React.ComponentType<P>,
+  fallback?: ReactNode
+) => {
+  const WrappedComponent = (props: P) => (
+    <ErrorBoundary fallback={fallback}>
+      <Component {...props} />
+    </ErrorBoundary>
+  );
+  
+  WrappedComponent.displayName = `withErrorBoundary(${Component.displayName || Component.name})`;
+  
+  return WrappedComponent;
+};
+
+export default ErrorBoundary;
