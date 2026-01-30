@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: theme('fontFamily.brand');
+  }
+  
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+}
+
+@layer components {
+  /* Chat Interface Components */
+  .chat-message {
+    @apply flex items-start space-x-3 p-4 rounded-lg animate-fade-in;
+  }
+  
+  .chat-message-user {
+    @apply bg-primary-500 text-white ml-auto max-w-xs lg:max-w-md;
+  }
+  
+  .chat-message-ai {
+    @apply bg-white border border-gray-200 mr-auto max-w-xs lg:max-w-md;
+  }
+  
+  .chat-input {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none;
+  }
+  
+  .btn-primary {
+    @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2;
+  }
+  
+  .guided-prompt {
+    @apply bg-white border border-gray-200 hover:border-primary-300 rounded-lg p-3 cursor-pointer transition-all duration-200 hover:shadow-sm;
+  }
+  
+  /* Typing Indicator */
+  .typing-indicator {
+    @apply flex items-center space-x-1 p-2;
+  }
+  
+  .typing-dot {
+    @apply w-2 h-2 bg-gray-400 rounded-full animate-pulse;
+  }
+  
+  /* Brand Customization Classes */
+  .brand-gradient {
+    background: linear-gradient(135deg, var(--primary-500), var(--accent-500));
+  }
+  
+  .brand-text {
+    @apply text-primary-600;
+  }
+  
+  .brand-bg {
+    @apply bg-primary-50;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.gray.300') theme('colors.gray.100');
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: theme('colors.gray.100');
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: theme('colors.gray.300');
+    border-radius: 3px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: theme('colors.gray.400');
+  }
+}
