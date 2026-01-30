@@ -1,11 +1,14 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import ChatInterface from './components/Chat/ChatInterface';
 import Header from './components/Layout/Header';
+import Navigation from './components/Layout/Navigation';
 import CompanyEnrichment from './components/CompanyEnrichment/CompanyEnrichment';
 import QualificationStatus from './components/Qualification/QualificationStatus';
 import ConnectNow from './components/Connect/ConnectNow';
-import { useChatStore, useQualificationStatus, useBrandConfig } from './store/chatStore';
+import TranscriptList from './components/Transcript/TranscriptList';
+import { useChatStore, useQualificationStatus, useBrandConfig, useHasUnsavedChanges } from './store/chatStore';
 import { handoffService } from './services/handoffService';
+import { crmService } from './services/crmService';
 import type { BrandConfig, HandoffConfig, SalesRep } from './types';
 
 // Demo brand configuration - would come from API based on client
@@ -91,9 +94,19 @@ const DEMO_SALES_REPS: SalesRep[] = [
 ];
 
 function App() {
-  const { setBrandConfig, addMessage, setHandoffConfig } = useChatStore();
+  const { 
+    setBrandConfig, 
+    addMessage, 
+    setHandoffConfig, 
+    continueConversationByEmail,
+    saveTranscript 
+  } = useChatStore();
   const qualificationStatus = useQualificationStatus();
   const brandConfig = useBrandConfig();
+  const hasUnsavedChanges = useHasUnsavedChanges();
+  
+  const [currentView, setCurrentView] = useState<'chat' | 'transcripts' | 'analytics' | 'settings'>('chat');
+  const [prospectEmail, setProspectEmail] = useState<string>('');
   
   useEffect(() => {
     // Initialize with demo brand config
@@ -103,15 +116,57 @@ function App() {
     setHandoffConfig(DEMO_HANDOFF_CONFIG);
     handoffService.updateReps(DEMO_SALES_REPS);
     
-    // Add welcome message
-    setTimeout(() => {
-      addMessage(
-        DEMO_BRAND_CONFIG.messaging.welcomeMessage,
-        'assistant',
-        { type: 'general' }
-      );
-    }, 500);
-  }, [setBrandConfig, addMessage, setHandoffConfig]);
+    // Initialize CRM service
+    crmService.updateConfig({
+      provider: 'custom',
+      autoSync: true,
+      syncTriggers: ['qualified', 'handoff'],
+      baseUrl: 'https://api.example.com/crm', // Demo URL
+    });
+    
+    // Check for returning prospect via URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    const email = urlParams.get('email');
+    const sessionId = urlParams.get('session');
+    
+    if (email) {
+      setProspectEmail(email);
+      // Try to continue existing conversation
+      continueConversationByEmail(email).then(found => {
+        if (!found) {
+          // New prospect, add welcome message
+          setTimeout(() => {
+            addMessage(
+              DEMO_BRAND_CONFIG.messaging.welcomeMessage,
+              'assistant',
+              { type: 'general' }
+            );
+          }, 500);
+        }
+      });
+    } else {
+      // Add welcome message for new session
+      setTimeout(() => {
+        addMessage(
+          DEMO_BRAND_CONFIG.messaging.welcomeMessage,
+          'assistant',
+          { type: 'general' }
+        );
+      }, 500);
+    }
+    
+    // Auto-save on page unload
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        saveTranscript();
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [setBrandConfig, addMessage, setHandoffConfig, continueConversationByEmail, hasUnsavedChanges, saveTranscript]);
   
   if (!brandConfig) {
     return (
@@ -121,91 +176,139 @@ function App() {
     );
   }
   
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header with branding */}
-      <Header brandConfig={brandConfig} />
+  // Render different views
+  const renderCurrentView = () => {
+    switch (currentView) {
+      case 'transcripts':
+        return <TranscriptList showViewer={true} />;
       
-      <div className="max-w-4xl mx-auto p-4">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-8rem)]">
-          {/* Main Chat Interface */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full">
-              <ChatInterface />
+      case 'analytics':
+        return (
+          <div className="max-w-4xl mx-auto p-6">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Analytics Dashboard</h1>
+            <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+              <p className="text-gray-600">Analytics dashboard coming in Sprint 10!</p>
+              <p className="text-sm text-gray-500 mt-2">
+                This will include conversation metrics, qualification trends, and conversion rates.
+              </p>
             </div>
           </div>
-          
-          {/* Sidebar with additional features */}
-          <div className="space-y-4">
-            {/* Company Enrichment */}
-            {brandConfig.features.showCompanyEnrichment && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <CompanyEnrichment />
-              </div>
-            )}
-            
-            {/* Qualification Status */}
-            {brandConfig.features.requireQualification && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <QualificationStatus />
-              </div>
-            )}
-            
-            {/* Connect Now */}
-            {(qualificationStatus.readyToConnect || brandConfig.features.allowDirectConnect) && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <ConnectNow />
-              </div>
-            )}
-            
-            {/* Company Info Card */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <h3 className="font-semibold text-gray-900 mb-2">About Us</h3>
-              <div className="text-sm text-gray-600 space-y-2">
-                <p>
-                  We help businesses like yours streamline operations and grow revenue 
-                  through innovative solutions.
-                </p>
-                <div className="pt-2 border-t border-gray-100">
-                  <div className="flex items-center space-x-2 text-xs text-gray-500">
-                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                    <span>Our team is online</span>
-                  </div>
-                </div>
-              </div>
+        );
+      
+      case 'settings':
+        return (
+          <div className="max-w-4xl mx-auto p-6">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Settings</h1>
+            <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+              <p className="text-gray-600">Configuration settings coming in Sprint 10!</p>
+              <p className="text-sm text-gray-500 mt-2">
+                Customize qualification criteria, CRM integration, and notification preferences.
+              </p>
             </div>
-            
-            {/* Trust Indicators */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <h3 className="font-semibold text-gray-900 mb-3">Why Companies Trust Us</h3>
-              <div className="space-y-3 text-sm text-gray-600">
-                <div className="flex items-center space-x-2">
-                  <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                    <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <span>500+ happy customers</span>
+          </div>
+        );
+        
+      default: // 'chat'
+        return (
+          <div className="max-w-4xl mx-auto p-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-8rem)]">
+              {/* Main Chat Interface */}
+              <div className="lg:col-span-2">
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full">
+                  <ChatInterface />
                 </div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                    <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
+              </div>
+              
+              {/* Sidebar with additional features */}
+              <div className="space-y-4">
+                {/* Company Enrichment */}
+                {brandConfig?.features.showCompanyEnrichment && (
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                    <CompanyEnrichment />
                   </div>
-                  <span>99.9% uptime guarantee</span>
+                )}
+                
+                {/* Qualification Status */}
+                {brandConfig?.features.requireQualification && (
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                    <QualificationStatus />
+                  </div>
+                )}
+                
+                {/* Connect Now */}
+                {(qualificationStatus.readyToConnect || brandConfig?.features.allowDirectConnect) && (
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                    <ConnectNow />
+                  </div>
+                )}
+                
+                {/* Company Info Card */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                  <h3 className="font-semibold text-gray-900 mb-2">About Us</h3>
+                  <div className="text-sm text-gray-600 space-y-2">
+                    <p>
+                      We help businesses like yours streamline operations and grow revenue 
+                      through innovative solutions.
+                    </p>
+                    <div className="pt-2 border-t border-gray-100">
+                      <div className="flex items-center space-x-2 text-xs text-gray-500">
+                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                        <span>Our team is online</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                    <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
+                
+                {/* Trust Indicators */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                  <h3 className="font-semibold text-gray-900 mb-3">Why Companies Trust Us</h3>
+                  <div className="space-y-3 text-sm text-gray-600">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
+                        <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <span>500+ happy customers</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
+                        <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <span>99.9% uptime guarantee</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
+                        <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <span>24/7 support</span>
+                    </div>
                   </div>
-                  <span>24/7 support</span>
                 </div>
               </div>
             </div>
           </div>
+        );
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* Sidebar Navigation */}
+      <Navigation currentView={currentView} onViewChange={setCurrentView} />
+      
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col lg:ml-0">
+        {/* Header with branding */}
+        <Header brandConfig={brandConfig} />
+        
+        {/* Current View Content */}
+        <div className="flex-1 overflow-auto">
+          {renderCurrentView()}
         </div>
       </div>
     </div>
