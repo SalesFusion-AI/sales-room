@@ -1,4 +1,4 @@
-import type { StoredConversation, TranscriptSummary, ProspectInfo, SalesRep } from '../types';
+import type { StoredConversation, TranscriptSummary, SalesRep } from '../types';
 import { DEFAULT_LEAD_TAGS } from '../services/transcriptService';
 
 // Demo company profiles for realistic scenarios

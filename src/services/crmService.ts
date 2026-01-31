@@ -535,7 +535,8 @@ export class CRMService {
         lastActivity: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
-        sessionId: 'test-session'
+        sessionId: 'test-session',
+        summary: undefined
       } as StoredConversation);
 
       return { success: true };

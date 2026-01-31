@@ -20,7 +20,7 @@ export class HandoffService {
     if (!this.config.businessHours) return true;
 
     const now = new Date();
-    const day = now.toLocaleDateString('en-US', { weekday: 'lowercase' }) as keyof typeof this.config.businessHours.days;
+    const day = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase() as keyof typeof this.config.businessHours.days;
     const dayConfig = this.config.businessHours.days[day];
     
     if (!dayConfig.enabled) return false;
@@ -123,7 +123,7 @@ export class HandoffService {
   }
 
   // Mock calendar API - replace with real implementation
-  private async mockCalendarAPI(email: string): Promise<{
+  private async mockCalendarAPI(_email: string): Promise<{
     busy: boolean;
     nextFree?: Date;
     currentEvent?: { title: string; endTime: string };

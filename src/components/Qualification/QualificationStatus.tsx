@@ -1,7 +1,7 @@
 import React from 'react';
 import { CheckCircle, Circle, AlertCircle, Sparkles, TrendingUp } from 'lucide-react';
 import { useQualificationStatus } from '../../store/chatStore';
-import type { QualificationStatus as QualificationStatusType, QualificationCriterion } from '../../types';
+import type { QualificationCriterion } from '../../types';
 
 const QualificationStatus: React.FC = () => {
   const qualificationStatus = useQualificationStatus();
@@ -64,7 +64,7 @@ const QualificationStatus: React.FC = () => {
         <div className="flex items-center space-x-2">
           <h3 className="font-semibold text-gray-900">Qualification Status</h3>
           {hasAiAssessment && hasAiAssessment.confidence > 0.7 && (
-            <Sparkles className="w-4 h-4 text-purple-500" title="AI-powered assessment" />
+            <Sparkles className="w-4 h-4 text-purple-500" />
           )}
         </div>
         <div className={`px-3 py-1 rounded-full text-sm font-medium border ${getScoreColor(qualificationStatus.score)}`}>

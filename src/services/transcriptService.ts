@@ -165,7 +165,6 @@ export class TranscriptService {
   // Generate AI summary of conversation
   async generateSummary(conversation: Conversation): Promise<TranscriptSummary> {
     const messages = conversation.messages;
-    const userMessages = messages.filter(m => m.role === 'user');
     const conversationText = messages.map(m => `${m.role}: ${m.content}`).join('\n');
     
     // Calculate conversation metrics

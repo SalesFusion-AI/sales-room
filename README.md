@@ -1,289 +1,182 @@
-# SalesFusion Sales Room
+# Sales Room
 
-A modern, AI-powered prospect-facing chat interface that helps leads self-educate, get qualified, and connect with sales teams.
+Prospect-facing AI chat interface for SalesFusion. A customizable React application that provides an interactive sales conversation experience for potential clients.
 
-## 🚀 Features
+## What It Does
 
-### ✅ Sprint 7 Complete
-- **7.1 Chat UI** - React-based LLM-style interface with smooth animations
-- **7.2 Branding Customization** - Per-client logo, colors, fonts, and messaging
-- **7.3 Guided Prompts** - Starter questions categorized by intent (product, pricing, process)
-- **7.4 Company Enrichment** - URL input with automated company data enrichment
-- **7.5 Knowledge Base Structure** - Foundation for client content management
-- **7.6 LLM Integration** - AI conversation system with context awareness
-- **7.7 Conversation Memory** - Session persistence and context retention
-- **7.8 Objection Handling** - AI detects and responds to prospect concerns
+Sales Room is the front-end customer interface that:
 
-## 🏗️ Architecture
+- **AI-Powered Sales Conversations**: Engages prospects with intelligent, contextual responses
+- **Company Research**: Automatically researches and displays relevant company information
+- **Guided Prompts**: Provides suggested conversation starters to guide prospects
+- **Transcript Management**: Maintains conversation history and allows transcript review
+- **Real-time Chat**: Smooth, responsive chat interface with typing indicators
+- **Brand Customization**: Easily customizable colors, fonts, and styling per client
+- **Connect Integration**: Seamless handoff to human sales representatives
+- **Mobile-Responsive**: Optimized for all device types
 
-### Core Components
-- **ChatInterface** - Main chat experience with typing indicators
-- **MessageBubble** - Rich message rendering with markdown support
-- **GuidedPrompts** - Category-based starter questions
-- **CompanyEnrichment** - Automated company intelligence
-- **QualificationStatus** - BANT qualification tracking
-- **ConnectNow** - Human handoff with multiple connection options
+## Architecture
 
-### State Management
-- **Zustand Store** - Lightweight, performant state management
-- **Conversation** - Message history and prospect information
-- **Qualification** - BANT scoring with automatic updates
-- **Branding** - Dynamic theme and customization
-
-### Styling
-- **Tailwind CSS** - utility-first CSS framework
-- **Custom Components** - Brand-aware design system
-- **Responsive Design** - Mobile-first approach
-- **Dark/Light Theme** - Brand customization support
-
-## 🎨 Branding System
-
-The Sales Room supports complete white-labeling:
-
-```typescript
-interface BrandConfig {
-  branding: {
-    logoUrl?: string;
-    colors: {
-      primary: string;    // Main brand color
-      secondary: string;  // Secondary brand color  
-      accent: string;     // Accent color for highlights
-    };
-    fonts: {
-      heading: string;    // Headings and titles
-      body: string;       // Body text and messages
-    };
-  };
-  messaging: {
-    welcomeMessage: string;     // First AI message
-    companyCta: string;         // Company enrichment CTA
-    qualificationCta: string;   // Qualification prompt
-    connectCta: string;         // Human handoff CTA
-  };
-}
+```
+src/
+├── components/
+│   ├── Chat/               # Chat interface components
+│   │   ├── ChatInterface.tsx
+│   │   ├── MessageBubble.tsx
+│   │   ├── TypingIndicator.tsx
+│   │   └── GuidedPrompts.tsx
+│   ├── CompanyEnrichment/  # Company research components
+│   ├── Layout/             # App layout and navigation
+│   ├── Transcript/         # Transcript viewing and management
+│   └── Connect/            # Human handoff components
+├── services/               # API services and integrations
+├── demo/                   # Demo data and mock services
+├── types/                  # TypeScript type definitions
+└── App.tsx                # Main application component
 ```
 
-## 🤖 AI Integration
+## Setup
 
-### Message Processing
-- Intent detection (question, objection, qualification)
-- Context-aware responses based on conversation history
-- Automatic qualification updates from user responses
-- Confidence scoring for AI responses
+### Environment Variables
 
-### Qualification Logic
-Automatic BANT (Budget, Authority, Need, Timeline) scoring:
-- **Budget** - Detects budget discussions and allocations
-- **Authority** - Identifies decision-making power
-- **Need** - Recognizes business problems and pain points
-- **Timeline** - Captures urgency and implementation timeframes
+Create a `.env` file with the following variables:
 
-### Response Types
-- **General** - Product and service information
-- **Qualification** - BANT-related responses
-- **Objection** - Handling concerns and pushback
-- **Connect** - Human handoff facilitation
+```bash
+# CRM Integration (connects to Pipeline Bot)
+REACT_APP_CRM_BASE_URL=http://localhost:3001/api/crm
+REACT_APP_CRM_API_KEY=your_api_key
 
-## 🏢 Company Enrichment
-
-Automated prospect company intelligence:
-- Domain-based data lookup
-- Industry and company size detection
-- Technology stack identification
-- Recent news and funding information
-- Employee count and revenue estimates
-
-## 📊 Qualification Tracking
-
-Real-time qualification scoring with visual indicators:
-- **0-24%** - Not Qualified (Red)
-- **25-74%** - Partially Qualified (Yellow)  
-- **75-100%** - Highly Qualified (Green)
-
-Qualified prospects automatically see connection options.
-
-## 🔗 Connection Options
-
-Multiple ways for prospects to connect:
-- **Talk Now** - Immediate callback request
-- **Schedule Call** - Calendar booking integration
-- **Email Info** - Information packet delivery
-
-## 🚀 Development
-
-### Prerequisites
-- Node.js 18+ 
-- npm or yarn
+# Optional: Development settings
+NODE_ENV=development
+```
 
 ### Installation
+
 ```bash
-git clone <repository>
-cd sales-room
+# Install dependencies
 npm install
 ```
 
-### Development Server
+## How to Run
+
+### Development
 ```bash
 npm run dev
 ```
+Starts the Vite development server with hot module replacement.
 
-### Build for Production
+### Production Build
 ```bash
+# Build for production
 npm run build
+
+# Preview production build locally
+npm run preview
 ```
 
-### Type Checking
+### Other Commands
 ```bash
-npm run type-check
+# Lint code
+npm run lint
 ```
 
-## 🎯 Usage
+## Features
 
-### Basic Integration
-```tsx
-import { SalesRoom } from '@salesfusion/sales-room';
+### Chat Interface
+- Real-time messaging with AI responses
+- Typing indicators for natural conversation flow
+- Message history and conversation persistence
+- Guided prompts to help prospects get started
 
-const brandConfig = {
-  branding: {
-    colors: {
-      primary: '#3b82f6',
-      secondary: '#64748b', 
-      accent: '#d946ef',
-    },
-    fonts: {
-      heading: 'Inter',
-      body: 'Inter',
-    },
-  },
-  messaging: {
-    welcomeMessage: 'Hi! How can I help you today?',
-  },
-  features: {
-    showCompanyEnrichment: true,
-    requireQualification: true,
-    allowDirectConnect: false,
-  },
-};
+### Company Enrichment
+- Automatic company research based on prospect information
+- Display of company details, industry, and relevant context
+- Integration with data enrichment services
 
-<SalesRoom 
-  brandConfig={brandConfig}
-  knowledgeBase={knowledgeBase}
-  onQualified={(prospect) => handleQualification(prospect)}
-  onConnect={(prospect, type) => handleConnection(prospect, type)}
-/>
+### Brand Customization
+The interface supports extensive brand customization through CSS custom properties:
+
+```css
+:root {
+  --primary-50: #eff6ff;
+  --primary-500: #3b82f6;
+  --primary-600: #2563eb;
+  /* ... and more color variables */
+}
 ```
 
-### Custom Knowledge Base
-```typescript
-const knowledgeBase = {
-  sections: [
-    {
-      id: '1',
-      title: 'Product Overview',
-      content: 'Our platform helps businesses...',
-      category: 'product',
-      tags: ['overview', 'features'],
-    }
-  ],
-  faqs: [
-    {
-      id: '1', 
-      question: 'How much does it cost?',
-      answer: 'Our pricing starts at $99/month...',
-      category: 'pricing',
-    }
-  ],
-  pricing: [
-    {
-      id: '1',
-      planName: 'Starter',
-      price: '$99/month',
-      features: ['Feature 1', 'Feature 2'],
-    }
-  ]
-};
+### Responsive Design
+- Mobile-first responsive design
+- Optimized for tablets and desktop
+- Touch-friendly interface elements
+- Accessible keyboard navigation
+
+## Integration with Pipeline Bot
+
+Sales Room communicates with Pipeline Bot through REST API calls:
+
+- **Chat Messages**: Sent to Pipeline Bot for AI processing
+- **Company Data**: Retrieved from CRM integrations
+- **Transcript Storage**: Conversations saved for sales team review
+- **Lead Handoff**: Smooth transition to human representatives
+
+## Customization
+
+### Brand Colors
+Update the CSS custom properties in `src/index.css`:
+- Primary colors: Main brand colors for buttons and accents
+- Secondary colors: Supporting UI elements
+- Accent colors: Highlights and special elements
+
+### Fonts
+Configure custom fonts in the CSS:
+```css
+html {
+  font-family: 'Your-Brand-Font', 'Inter', system-ui, sans-serif;
+}
 ```
 
-## 🔧 Configuration
+### Messaging
+Customize AI prompts and guided conversation starters in:
+- `src/components/Chat/GuidedPrompts.tsx`
+- `src/demo/demoData.ts` (for demo content)
 
-### Environment Variables
-```bash
-VITE_API_BASE_URL=https://api.salesfusion.com
-VITE_AI_MODEL=claude-sonnet-4
-VITE_ENABLE_ENRICHMENT=true
-VITE_ENABLE_QUALIFICATION=true
-```
+## Demo Mode
 
-### Feature Flags
-- `showCompanyEnrichment` - Enable company URL input and enrichment
-- `requireQualification` - Show qualification tracking
-- `allowDirectConnect` - Allow unqualified connection attempts
-- `captureEmail` - Require email before connecting
-- `showPricing` - Display pricing information
+The application includes a demo mode with:
+- Mock conversation data
+- Simulated AI responses
+- Example company enrichment data
+- Sample transcripts
 
-## 📈 Analytics
+To enable demo mode, the app automatically uses demo services when API endpoints are unavailable.
 
-The Sales Room tracks key engagement metrics:
-- **Message Count** - Total conversation length
-- **Qualification Score** - BANT progression
-- **Company Enriched** - Successful company lookups
-- **Connection Requests** - Human handoff attempts
-- **Objections Raised** - Concern detection and handling
+## Technologies
 
-## 🔒 Security
+- **Frontend**: React 19 with TypeScript
+- **Styling**: Tailwind CSS v4
+- **Build Tool**: Vite
+- **State Management**: Zustand
+- **Markdown**: React Markdown with syntax highlighting
+- **Icons**: Lucide React
+- **Testing**: Vitest (configured)
+- **Code Quality**: ESLint with TypeScript rules
 
-- Input sanitization for all user messages
-- Rate limiting on message sending
-- Secure API key handling
-- Data encryption in transit and at rest
-- GDPR-compliant data handling
+## Browser Support
 
-## 🤝 Integration Points
+- Chrome (latest)
+- Firefox (latest)
+- Safari (latest)
+- Edge (latest)
+- Mobile browsers (iOS Safari, Chrome Mobile)
 
-### CRM Integration
-- Automatic prospect creation
-- Conversation logging
-- Qualification status sync
-- Activity tracking
+## Performance
 
-### Calendar Integration  
-- Scheduling system connection
-- Availability checking
-- Meeting booking
-- Reminder automation
-
-### Email Integration
-- Information packet delivery
-- Follow-up sequences
-- Nurture campaign enrollment
-
-## 📱 Mobile Support
-
-Fully responsive design optimized for:
-- iPhone and Android devices
-- Tablet experiences  
-- Desktop and laptop screens
-- Touch and keyboard interactions
-
-## 🔄 Future Enhancements
-
-### Sprint 8+ Roadmap
-- **Advanced Qualification** - Custom qualification criteria
-- **Multi-language Support** - Internationalization
-- **Voice Chat** - Speech-to-text integration
-- **Video Chat** - WebRTC connection capability
-- **Advanced Analytics** - Conversation insights and optimization
-- **A/B Testing** - Message and prompt optimization
-- **Integration Hub** - Third-party tool connections
-
-## 📞 Support
-
-For technical support or feature requests:
-- Documentation: [docs.salesfusion.com](https://docs.salesfusion.com)
-- Issues: GitHub Issues
-- Email: support@salesfusion.com
-- Discord: [Join Community](https://discord.com/invite/salesfusion)
+- Code splitting for optimal loading
+- Lazy loading of components
+- Optimized bundle size with tree shaking
+- CDN-ready static assets
 
 ---
 
-Built with ❤️ by the SalesFusion team
+Built for SalesFusion by Angelo AI

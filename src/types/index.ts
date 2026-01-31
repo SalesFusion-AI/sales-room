@@ -334,3 +334,44 @@ export interface RichMessage extends Message {
     };
   };
 }
+
+// Additional types for transcripts and CRM
+export interface TranscriptSummary {
+  id: string;
+  sessionId: string;
+  generatedAt: Date;
+  keyPoints: string[];
+  concerns: string[];
+  painPoints: string[];
+  qualificationSummary: {
+    score: number;
+    criteria: Record<string, { status: string; evidence: string[] }>;
+    readyToConnect: boolean;
+  };
+  nextSteps: string[];
+  aiConfidence: number;
+  wordCount: number;
+  messageCount: number;
+  duration: number; // in minutes
+}
+
+export interface LeadTag {
+  id: string;
+  name: string;
+  color: string;
+  description: string;
+  autoAssignRule: {
+    scoreMin?: number;
+    scoreMax?: number;
+    criteria?: string[];
+    keywords?: string[];
+  };
+}
+
+export interface StoredConversation extends Conversation {
+  tags: LeadTag[];
+  summary?: TranscriptSummary;
+  crmSynced: boolean;
+  crmId?: string;
+  lastActivity: Date;
+}

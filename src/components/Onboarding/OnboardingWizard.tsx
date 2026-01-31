@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   CheckCircle,
-  Circle,
   Upload,
   Palette,
   Target,
@@ -13,7 +12,6 @@ import {
   Rocket,
   ArrowRight,
   ArrowLeft,
-  Sparkles,
   MessageSquare,
   Building
 } from 'lucide-react';

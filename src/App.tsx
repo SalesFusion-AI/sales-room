@@ -1,385 +1,181 @@
-import { useEffect, useState } from 'react';
-import { AlertTriangle } from 'lucide-react';
-import ChatInterface from './components/Chat/ChatInterface';
-import Header from './components/Layout/Header';
-import Navigation from './components/Layout/Navigation';
-import LoadingState from './components/Layout/LoadingState';
-import ErrorBoundary from './components/Layout/ErrorBoundary';
-import CompanyEnrichment from './components/CompanyEnrichment/CompanyEnrichment';
-import QualificationStatus from './components/Qualification/QualificationStatus';
-import ConnectNow from './components/Connect/ConnectNow';
-import TranscriptList from './components/Transcript/TranscriptList';
-import AnalyticsDashboard from './components/Analytics/AnalyticsDashboard';
-import OnboardingWizard from './components/Onboarding/OnboardingWizard';
-import { useChatStore, useQualificationStatus, useBrandConfig, useHasUnsavedChanges } from './store/chatStore';
-import { handoffService } from './services/handoffService';
-import { crmService } from './services/crmService';
-import { demoService } from './demo/demoService';
-import type { BrandConfig, HandoffConfig, SalesRep } from './types';
-
-// Demo brand configuration - would come from API based on client
-const DEMO_BRAND_CONFIG: BrandConfig = {
-  id: 'demo',
-  clientId: 'salesfusion-demo',
-  branding: {
-    logoUrl: undefined, // Would be client's logo
-    colors: {
-      primary: '#3b82f6', // Blue
-      secondary: '#64748b', // Slate  
-      accent: '#d946ef', // Purple
-    },
-    fonts: {
-      heading: 'Inter',
-      body: 'Inter',
-    },
-  },
-  messaging: {
-    welcomeMessage: 'Hi! I\'m here to help you learn about our solution 👋',
-    companyCta: 'Tell me about your company',
-    qualificationCta: 'Let\'s see if we\'re a good fit',
-    connectCta: 'Ready to speak with our team?',
-    offlineMessage: 'Our team is currently offline, but I can still help answer your questions!',
-  },
-  features: {
-    showCompanyEnrichment: true,
-    requireQualification: true,
-    allowDirectConnect: false,
-    captureEmail: true,
-    showPricing: true,
-  },
-};
-
-// Demo handoff configuration
-const DEMO_HANDOFF_CONFIG: HandoffConfig = {
-  enableTalkNow: true,
-  enableSlackNotifications: true,
-  slackConfig: {
-    channel: '#sales-leads',
-    mentionUsers: ['USLACKID123'], // Replace with real Slack user IDs
-    webhookUrl: 'https://hooks.slack.com/services/your/webhook/url', // Replace with real webhook
-  },
-  availabilitySources: ['calendar', 'slack', 'manual'],
-  defaultCalendarUrl: 'https://calendly.com/your-team/15min',
-  scoreThresholdForHandoff: 75,
-  businessHours: {
-    timezone: 'America/New_York',
-    days: {
-      monday: { start: '09:00', end: '17:00', enabled: true },
-      tuesday: { start: '09:00', end: '17:00', enabled: true },
-      wednesday: { start: '09:00', end: '17:00', enabled: true },
-      thursday: { start: '09:00', end: '17:00', enabled: true },
-      friday: { start: '09:00', end: '17:00', enabled: true },
-      saturday: { start: '10:00', end: '14:00', enabled: false },
-      sunday: { start: '10:00', end: '14:00', enabled: false }
-    }
-  }
-};
-
-// Demo sales reps - would come from API/CRM
-const DEMO_SALES_REPS: SalesRep[] = [
-  {
-    id: 'rep-1',
-    name: 'Sarah Johnson',
-    title: 'Senior Sales Consultant',
-    email: 'sarah.j@company.com',
-    slackUserId: 'USLACK123',
-    calendarUrl: 'https://calendly.com/sarah-j/15min',
-    timezone: 'America/New_York',
-    isActive: true,
-  },
-  {
-    id: 'rep-2', 
-    name: 'Michael Chen',
-    title: 'Sales Executive',
-    email: 'michael.c@company.com',
-    slackUserId: 'USLACK456',
-    calendarUrl: 'https://calendly.com/michael-c/15min',
-    timezone: 'America/New_York',
-    isActive: true,
-  }
-];
+import { useState, useRef, useEffect } from 'react';
+import { Send, MessageSquare, Calendar, User, CheckCircle } from 'lucide-react';
+import { useDemoStore, useMessages, useIsTyping, useProspectInfo, useQualificationStatus } from './store/demoStore';
 
 function App() {
-  const { 
-    setBrandConfig, 
-    addMessage, 
-    setHandoffConfig, 
-    continueConversationByEmail,
-    saveTranscript 
-  } = useChatStore();
-  const qualificationStatus = useQualificationStatus();
-  const brandConfig = useBrandConfig();
-  const hasUnsavedChanges = useHasUnsavedChanges();
-  
-  const [currentView, setCurrentView] = useState<'chat' | 'transcripts' | 'analytics' | 'settings'>('chat');
-  const [prospectEmail, setProspectEmail] = useState<string>('');
-  const [demoInitialized, setDemoInitialized] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
-  const [initError, setInitError] = useState<string | null>(null);
-  
+  const { addMessage } = useDemoStore();
+  const messages = useMessages();
+  const isTyping = useIsTyping();
+  const prospectInfo = useProspectInfo();
+  const { isQualified, showConnect } = useQualificationStatus();
+  const [inputMessage, setInputMessage] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom
   useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        setIsInitializing(true);
-        setInitError(null);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isTyping]);
 
-        // Initialize with demo brand config
-        setBrandConfig(DEMO_BRAND_CONFIG);
-        
-        // Initialize handoff configuration
-        setHandoffConfig(DEMO_HANDOFF_CONFIG);
-        handoffService.updateReps(DEMO_SALES_REPS);
-        
-        // Initialize CRM service
-        crmService.updateConfig({
-          provider: 'custom',
-          autoSync: true,
-          syncTriggers: ['qualified', 'handoff'],
-          baseUrl: 'https://api.example.com/crm', // Demo URL
-        });
+  const handleSendMessage = () => {
+    if (inputMessage.trim()) {
+      addMessage(inputMessage, 'user');
+      setInputMessage('');
+    }
+  };
 
-        // Check if we should auto-initialize demo (for webinar)
-        const urlParams = new URLSearchParams(window.location.search);
-        const isDemoMode = urlParams.get('demo') === 'true' || window.location.hostname.includes('demo');
-        
-        if (isDemoMode) {
-          try {
-            await demoService.initializeDemoEnvironment();
-            setDemoInitialized(true);
-            console.log('🎬 Demo environment ready for webinar!');
-          } catch (error) {
-            console.error('Failed to initialize demo:', error);
-            setInitError('Demo initialization failed');
-          }
-        }
-        
-        // Check for returning prospect via URL params
-        const email = urlParams.get('email');
-        
-        if (email) {
-          setProspectEmail(email);
-          // Try to continue existing conversation
-          const found = await continueConversationByEmail(email);
-          if (!found) {
-            // New prospect, add welcome message
-            setTimeout(() => {
-              addMessage(
-                DEMO_BRAND_CONFIG.messaging.welcomeMessage,
-                'assistant',
-                { type: 'general' }
-              );
-            }, 500);
-          }
-        } else {
-          // Add welcome message for new session
-          setTimeout(() => {
-            addMessage(
-              DEMO_BRAND_CONFIG.messaging.welcomeMessage,
-              'assistant',
-              { type: 'general' }
-            );
-          }, 500);
-        }
-        
-      } catch (error) {
-        console.error('Failed to initialize app:', error);
-        setInitError('Application initialization failed');
-      } finally {
-        setIsInitializing(false);
-      }
-    };
-
-    initializeApp();
-    
-    // Auto-save on page unload
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
-        saveTranscript();
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    };
-    
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, []);
-  
-  // Show loading state during initialization
-  if (isInitializing || !brandConfig) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <LoadingState 
-          type="default" 
-          message={demoInitialized ? "Setting up demo environment..." : "Initializing Sales Room..."}
-          showProgress={demoInitialized}
-          progress={demoInitialized ? 85 : 45}
-        />
-      </div>
-    );
-  }
-
-  // Show error state if initialization failed
-  if (initError) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <AlertTriangle className="w-8 h-8 text-red-600" />
-            </div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Initialization Error</h2>
-            <p className="text-sm text-gray-600 mb-4">{initError}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors"
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  
-  // Render different views
-  const renderCurrentView = () => {
-    switch (currentView) {
-      case 'transcripts':
-        return <TranscriptList showViewer={true} />;
-      
-      case 'analytics':
-        return <AnalyticsDashboard />;
-      
-      case 'settings':
-        return <OnboardingWizard />;
-        
-      default: // 'chat'
-        return (
-          <div className="max-w-4xl mx-auto p-4">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-8rem)]">
-              {/* Main Chat Interface */}
-              <div className="lg:col-span-2">
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full">
-                  <ChatInterface />
-                </div>
-              </div>
-              
-              {/* Sidebar with additional features */}
-              <div className="space-y-4">
-                {/* Company Enrichment */}
-                {brandConfig?.features.showCompanyEnrichment && (
-                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                    <CompanyEnrichment />
-                  </div>
-                )}
-                
-                {/* Qualification Status */}
-                {brandConfig?.features.requireQualification && (
-                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                    <QualificationStatus />
-                  </div>
-                )}
-                
-                {/* Connect Now */}
-                {(qualificationStatus.readyToConnect || brandConfig?.features.allowDirectConnect) && (
-                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                    <ConnectNow />
-                  </div>
-                )}
-                
-                {/* Company Info Card */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                  <h3 className="font-semibold text-gray-900 mb-2">About Us</h3>
-                  <div className="text-sm text-gray-600 space-y-2">
-                    <p>
-                      We help businesses like yours streamline operations and grow revenue 
-                      through innovative solutions.
-                    </p>
-                    <div className="pt-2 border-t border-gray-100">
-                      <div className="flex items-center space-x-2 text-xs text-gray-500">
-                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                        <span>Our team is online</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Trust Indicators */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                  <h3 className="font-semibold text-gray-900 mb-3">Why Companies Trust Us</h3>
-                  <div className="space-y-3 text-sm text-gray-600">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                        <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                      <span>500+ happy customers</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                        <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                      <span>99.9% uptime guarantee</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                        <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                      <span>24/7 support</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
     }
   };
 
   return (
-    <ErrorBoundary>
-      <div className="min-h-screen bg-gray-50 flex">
-        {/* Sidebar Navigation */}
-        <Navigation currentView={currentView} onViewChange={setCurrentView} />
-        
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col lg:ml-0">
-          {/* Header with branding */}
-          <Header brandConfig={brandConfig} />
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                <MessageSquare className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">SalesFusion AI</h1>
+                <p className="text-sm text-gray-600">Your Sales Automation Assistant</p>
+              </div>
+            </div>
+            
+            {/* Subtle progress indicator */}
+            {prospectInfo.name && (
+              <div className="flex items-center space-x-4 text-sm">
+                {prospectInfo.name && (
+                  <div className="flex items-center text-gray-600">
+                    <User className="h-4 w-4 mr-1" />
+                    {prospectInfo.name}
+                  </div>
+                )}
+                {isQualified && (
+                  <div className="flex items-center text-green-600">
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    Qualified
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Main Chat Interface */}
+      <div className="max-w-4xl mx-auto p-4">
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden" style={{ height: 'calc(100vh - 140px)' }}>
           
-          {/* Demo Mode Indicator */}
-          {demoInitialized && (
-            <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-2">
-              <div className="max-w-7xl mx-auto flex items-center justify-between text-sm">
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                  <span className="font-medium">🎬 DEMO MODE ACTIVE</span>
-                  <span className="opacity-75">- Ready for Feb 21 webinar presentation</span>
-                </div>
-                <button
-                  onClick={() => demoService.startWebinar()}
-                  className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-md transition-colors"
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-4" style={{ height: 'calc(100% - 140px)' }}>
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${
+                    message.role === 'user'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-100 text-gray-800 shadow-sm'
+                  }`}
                 >
-                  Start Webinar Mode
+                  <p className="text-sm leading-relaxed">{message.content}</p>
+                  <p className={`text-xs mt-2 ${
+                    message.role === 'user' ? 'text-blue-100' : 'text-gray-500'
+                  }`}>
+                    {message.timestamp.toLocaleTimeString()}
+                  </p>
+                </div>
+              </div>
+            ))}
+
+            {/* Typing indicator */}
+            {isTyping && (
+              <div className="flex justify-start">
+                <div className="bg-gray-100 rounded-2xl px-4 py-3 shadow-sm">
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Connect Option */}
+          {showConnect && (
+            <div className="border-t bg-green-50 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <Calendar className="h-5 w-5 text-green-600 mr-2" />
+                  <div>
+                    <p className="text-sm font-medium text-green-800">Ready to connect with our team?</p>
+                    <p className="text-xs text-green-600">Schedule a personalized demo</p>
+                  </div>
+                </div>
+                <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                  Book Demo
                 </button>
               </div>
             </div>
           )}
-          
-          {/* Current View Content */}
-          <div className="flex-1 overflow-auto">
-            <ErrorBoundary>
-              {renderCurrentView()}
-            </ErrorBoundary>
+
+          {/* Input Area */}
+          <div className="border-t bg-gray-50 p-4">
+            <div className="flex space-x-3">
+              <input
+                type="text"
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type your message..."
+                className="flex-1 border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={isTyping}
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={!inputMessage.trim() || isTyping}
+                className="bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg transition-colors flex items-center"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Suggested Prompts */}
+            <div className="mt-4 flex flex-wrap gap-2">
+              {[
+                'Hi, I\'m John from TechFlow Solutions',
+                'What makes your platform different?',
+                'I need to automate our sales process',
+                'Tell me about pricing',
+                'I\'m a sales manager looking for efficiency'
+              ].map((prompt) => (
+                <button
+                  key={prompt}
+                  onClick={() => {
+                    setInputMessage(prompt);
+                    setTimeout(() => {
+                      if (prompt === inputMessage) handleSendMessage();
+                    }, 100);
+                  }}
+                  className="text-sm bg-white hover:bg-gray-50 text-gray-700 px-3 py-1 rounded-full border border-gray-200 transition-colors"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
-    </ErrorBoundary>
+    </div>
   );
 }
 
