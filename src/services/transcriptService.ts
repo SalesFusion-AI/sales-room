@@ -98,6 +98,68 @@ export const DEFAULT_LEAD_TAGS: LeadTag[] = [
 export class TranscriptService {
   private storageKey = 'salesfusion_transcripts';
   private summaryKey = 'salesfusion_summaries';
+  private isLocalStorageAvailable = true;
+  private inMemoryTranscripts: StoredConversation[] = [];
+  private inMemorySummaries: TranscriptSummary[] = [];
+  
+  constructor() {
+    // Check if localStorage is available
+    this.checkLocalStorageAvailability();
+  }
+
+  // Check if localStorage is available and working
+  private checkLocalStorageAvailability(): void {
+    try {
+      const testKey = '__localStorage_test__';
+      localStorage.setItem(testKey, 'test');
+      localStorage.removeItem(testKey);
+      this.isLocalStorageAvailable = true;
+    } catch (error) {
+      console.warn('localStorage is not available, falling back to in-memory storage:', error);
+      this.isLocalStorageAvailable = false;
+    }
+  }
+
+  // Safe localStorage getItem with fallback
+  private safeGetItem(key: string): string | null {
+    if (!this.isLocalStorageAvailable) {
+      return null;
+    }
+    
+    try {
+      return localStorage.getItem(key);
+    } catch (error) {
+      console.error(`Failed to get item from localStorage (key: ${key}):`, error);
+      this.isLocalStorageAvailable = false;
+      return null;
+    }
+  }
+
+  // Safe localStorage setItem with fallback
+  private safeSetItem(key: string, value: string): boolean {
+    if (!this.isLocalStorageAvailable) {
+      return false;
+    }
+    
+    try {
+      localStorage.setItem(key, value);
+      return true;
+    } catch (error) {
+      console.error(`Failed to set item in localStorage (key: ${key}):`, error);
+      this.isLocalStorageAvailable = false;
+      return false;
+    }
+  }
+
+  // Safe JSON parse with error handling
+  private safeJsonParse<T>(jsonString: string, fallback: T): T {
+    try {
+      return JSON.parse(jsonString);
+    } catch (error) {
+      console.error('Failed to parse JSON:', error);
+      return fallback;
+    }
+  }
   
   // Store conversation transcript
   async storeConversation(conversation: Conversation): Promise<StoredConversation> {
@@ -119,8 +181,13 @@ export class TranscriptService {
       transcripts.push(storedConversation);
     }
 
-    // Store back to localStorage (in production, this would be a database)
-    localStorage.setItem(this.storageKey, JSON.stringify(transcripts));
+    // Try to store in localStorage, fallback to in-memory storage
+    const success = this.safeSetItem(this.storageKey, JSON.stringify(transcripts));
+    if (!success) {
+      // Fallback to in-memory storage
+      this.inMemoryTranscripts = transcripts;
+      console.warn('Using in-memory storage for transcripts');
+    }
     
     return storedConversation;
   }
@@ -128,10 +195,13 @@ export class TranscriptService {
   // Get stored transcripts
   getStoredTranscripts(): StoredConversation[] {
     try {
-      const stored = localStorage.getItem(this.storageKey);
-      if (!stored) return [];
+      const stored = this.safeGetItem(this.storageKey);
+      if (!stored) {
+        // Return in-memory storage if localStorage is unavailable
+        return this.isLocalStorageAvailable ? [] : this.inMemoryTranscripts;
+      }
       
-      const transcripts = JSON.parse(stored);
+      const transcripts = this.safeJsonParse(stored, []);
       return transcripts.map((t: any) => ({
         ...t,
         createdAt: new Date(t.createdAt),
@@ -144,7 +214,8 @@ export class TranscriptService {
       }));
     } catch (error) {
       console.error('Failed to load stored transcripts:', error);
-      return [];
+      // Return in-memory storage as fallback
+      return this.isLocalStorageAvailable ? [] : this.inMemoryTranscripts;
     }
   }
 
@@ -210,23 +281,33 @@ export class TranscriptService {
       summaries.push(summary);
     }
     
-    localStorage.setItem(this.summaryKey, JSON.stringify(summaries));
+    // Try to store in localStorage, fallback to in-memory storage
+    const success = this.safeSetItem(this.summaryKey, JSON.stringify(summaries));
+    if (!success) {
+      // Fallback to in-memory storage
+      this.inMemorySummaries = summaries;
+      console.warn('Using in-memory storage for summaries');
+    }
   }
 
   // Get stored summaries
   private getStoredSummaries(): TranscriptSummary[] {
     try {
-      const stored = localStorage.getItem(this.summaryKey);
-      if (!stored) return [];
+      const stored = this.safeGetItem(this.summaryKey);
+      if (!stored) {
+        // Return in-memory storage if localStorage is unavailable
+        return this.isLocalStorageAvailable ? [] : this.inMemorySummaries;
+      }
       
-      const summaries = JSON.parse(stored);
+      const summaries = this.safeJsonParse(stored, []);
       return summaries.map((s: any) => ({
         ...s,
         generatedAt: new Date(s.generatedAt),
       }));
     } catch (error) {
       console.error('Failed to load stored summaries:', error);
-      return [];
+      // Return in-memory storage as fallback
+      return this.isLocalStorageAvailable ? [] : this.inMemorySummaries;
     }
   }
 
