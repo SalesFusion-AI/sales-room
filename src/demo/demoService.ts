@@ -14,6 +14,7 @@ export class DemoService {
   private isInitialized = false;
   private currentDemoStep = 0;
   private webinarMode = false;
+  private activityIntervalId: ReturnType<typeof setInterval> | null = null;
 
   // Initialize demo environment
   async initializeDemoEnvironment(): Promise<void> {
@@ -342,13 +343,32 @@ Step ${this.currentDemoStep + 1} of ${steps.length}
   simulateRealTimeActivity(): void {
     if (!this.isInitialized) return;
 
+    // Clear any existing interval to prevent memory leaks
+    this.stopRealTimeActivity();
+
     // Simulate new conversations coming in during demo
-    setInterval(() => {
+    this.activityIntervalId = setInterval(() => {
       if (this.webinarMode && Math.random() > 0.7) {
         console.log('📥 New demo conversation started...');
         // Could trigger UI updates to show live activity
       }
     }, 30000); // Every 30 seconds
+  }
+
+  // Stop real-time activity simulation
+  stopRealTimeActivity(): void {
+    if (this.activityIntervalId) {
+      clearInterval(this.activityIntervalId);
+      this.activityIntervalId = null;
+    }
+  }
+
+  // Clean up demo service
+  cleanup(): void {
+    this.stopRealTimeActivity();
+    this.isInitialized = false;
+    this.webinarMode = false;
+    this.currentDemoStep = 0;
   }
 }
 

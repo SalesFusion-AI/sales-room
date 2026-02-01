@@ -233,10 +233,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   
   setBrandConfig: (config: BrandConfig) => {
     set({ brandConfig: config });
-    // Apply brand colors to CSS variables
-    document.documentElement.style.setProperty('--primary-500', config.branding.colors.primary);
-    document.documentElement.style.setProperty('--secondary-500', config.branding.colors.secondary);
-    document.documentElement.style.setProperty('--accent-500', config.branding.colors.accent);
+    // Apply brand colors to CSS variables (only in browser)
+    if (typeof document !== 'undefined') {
+      document.documentElement.style.setProperty('--primary-500', config.branding.colors.primary);
+      document.documentElement.style.setProperty('--secondary-500', config.branding.colors.secondary);
+      document.documentElement.style.setProperty('--accent-500', config.branding.colors.accent);
+    }
   },
 
   setHandoffConfig: (config: HandoffConfig) => {
