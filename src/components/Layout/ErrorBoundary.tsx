@@ -67,18 +67,26 @@ class ErrorBoundary extends Component<Props, State> {
       stack: error?.stack,
       componentStack: errorInfo?.componentStack,
       timestamp: new Date().toISOString(),
-      userAgent: navigator.userAgent,
-      url: window.location.href
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+      url: typeof window !== 'undefined' ? window.location.href : 'unknown'
     };
 
-    // Copy error data to clipboard for easy reporting
-    navigator.clipboard.writeText(JSON.stringify(errorData, null, 2))
-      .then(() => {
-        alert('Error details copied to clipboard. Please send this to our support team.');
-      })
-      .catch(() => {
-        console.error('Failed to copy error details');
-      });
+    // Copy error data to clipboard for easy reporting (with fallback)
+    const errorText = JSON.stringify(errorData, null, 2);
+    
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(errorText)
+        .then(() => {
+          alert('Error details copied to clipboard. Please send this to our support team.');
+        })
+        .catch(() => {
+          // Fallback: show in prompt for manual copy
+          prompt('Copy this error report:', errorText);
+        });
+    } else {
+      // Fallback for browsers without clipboard API
+      prompt('Copy this error report:', errorText);
+    }
   };
 
   public render() {

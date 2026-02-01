@@ -103,7 +103,7 @@ const AnalyticsDashboard: React.FC = () => {
     },
     {
       title: 'Qualification Rate', 
-      value: `${analytics.qualificationRate || Math.round((analytics.hotLeads + analytics.warmLeads) / analytics.totalConversations * 100) || 0}%`,
+      value: `${analytics.qualificationRate || (analytics.totalConversations > 0 ? Math.round((analytics.hotLeads + analytics.warmLeads) / analytics.totalConversations * 100) : 0)}%`,
       change: +12,
       changeLabel: 'vs last month',
       icon: Target,
@@ -334,7 +334,7 @@ const AnalyticsDashboard: React.FC = () => {
                       <div className="flex-1 bg-gray-200 rounded-full h-2">
                         <div
                           className="h-2 bg-green-500 rounded-full transition-all duration-500"
-                          style={{ width: `${(week.qualified / week.conversations) * 100}%` }}
+                          style={{ width: `${week.conversations > 0 ? (week.qualified / week.conversations) * 100 : 0}%` }}
                         ></div>
                       </div>
                       <div className="w-8 text-xs text-gray-700">{week.qualified}</div>
@@ -346,7 +346,7 @@ const AnalyticsDashboard: React.FC = () => {
                       <div className="flex-1 bg-gray-200 rounded-full h-2">
                         <div
                           className="h-2 bg-purple-500 rounded-full transition-all duration-500"
-                          style={{ width: `${(week.booked / week.qualified) * 100}%` }}
+                          style={{ width: `${week.qualified > 0 ? (week.booked / week.qualified) * 100 : 0}%` }}
                         ></div>
                       </div>
                       <div className="w-8 text-xs text-gray-700">{week.booked}</div>
