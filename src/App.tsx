@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, MessageSquare, Calendar, User, CheckCircle } from 'lucide-react';
-import { useDemoStore, useMessages, useIsTyping, useProspectInfo, useQualificationStatus } from './store/demoStore';
+import { Send, MessageSquare, User, AlertCircle } from 'lucide-react';
+import { useChatStore, useMessages, useIsTyping, useProspectInfo, useError } from './store/chatStore';
 
 function App() {
-  const { addMessage } = useDemoStore();
+  const { sendUserMessage } = useChatStore();
   const messages = useMessages();
   const isTyping = useIsTyping();
   const prospectInfo = useProspectInfo();
-  const { isQualified, showConnect } = useQualificationStatus();
+  const error = useError();
   const [inputMessage, setInputMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -16,10 +16,11 @@ function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  const handleSendMessage = () => {
-    if (inputMessage.trim()) {
-      addMessage(inputMessage, 'user');
+  const handleSendMessage = async () => {
+    if (inputMessage.trim() && !isTyping) {
+      const message = inputMessage;
       setInputMessage('');
+      await sendUserMessage(message);
     }
   };
 
@@ -27,6 +28,13 @@ function App() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
+    }
+  };
+
+  const handlePromptClick = (prompt: string) => {
+    if (!isTyping) {
+      setInputMessage('');
+      sendUserMessage(prompt);
     }
   };
 
@@ -46,32 +54,34 @@ function App() {
               </div>
             </div>
             
-            {/* Subtle progress indicator */}
+            {/* Prospect info indicator */}
             {prospectInfo.name && (
               <div className="flex items-center space-x-4 text-sm">
-                {prospectInfo.name && (
-                  <div className="flex items-center text-gray-300 bg-gray-800 px-3 py-1.5 rounded-full">
-                    <User className="h-4 w-4 mr-2" />
-                    {prospectInfo.name}
-                  </div>
-                )}
-                {isQualified && (
-                  <div className="flex items-center text-green-400 bg-green-400/10 px-3 py-1.5 rounded-full">
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Qualified
-                  </div>
-                )}
+                <div className="flex items-center text-gray-300 bg-gray-800 px-3 py-1.5 rounded-full">
+                  <User className="h-4 w-4 mr-2" />
+                  {prospectInfo.name}
+                </div>
               </div>
             )}
           </div>
         </div>
       </header>
 
-      {/* Main Chat Container - Fixed Height */}
+      {/* Main Chat Container */}
       <div className="flex-1 flex flex-col min-h-0 max-w-4xl mx-auto w-full">
         <div className="flex-1 flex flex-col bg-gray-950 mx-4 my-4 rounded-3xl shadow-2xl border border-gray-800 overflow-hidden">
           
-          {/* Messages Area - Scrollable */}
+          {/* Error Banner */}
+          {error && (
+            <div className="flex-shrink-0 bg-red-900/50 border-b border-red-800 px-4 py-3">
+              <div className="flex items-center text-red-300 text-sm">
+                <AlertCircle className="h-4 w-4 mr-2" />
+                {error}
+              </div>
+            </div>
+          )}
+
+          {/* Messages Area */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4 scroll-smooth">
             {messages.map((message) => (
               <div
@@ -85,7 +95,7 @@ function App() {
                       : 'bg-gray-800 text-gray-100 border border-gray-700'
                   }`}
                 >
-                  <p className="text-sm leading-relaxed">{message.content}</p>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
                   <p className={`text-xs mt-2 ${
                     message.role === 'user' ? 'text-blue-100' : 'text-gray-400'
                   }`}>
@@ -109,26 +119,6 @@ function App() {
             )}
             <div ref={messagesEndRef} />
           </div>
-
-          {/* Connect Option */}
-          {showConnect && (
-            <div className="flex-shrink-0 border-t border-gray-800 bg-gradient-to-r from-green-900/50 to-emerald-900/50 backdrop-blur-sm p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="w-10 h-10 bg-green-500/20 rounded-2xl flex items-center justify-center mr-3">
-                    <Calendar className="h-5 w-5 text-green-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-green-300">Ready to connect with our team?</p>
-                    <p className="text-xs text-green-400">Schedule a personalized demo</p>
-                  </div>
-                </div>
-                <button className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-2.5 rounded-2xl text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl">
-                  Book Demo
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Input Area */}
           <div className="flex-shrink-0 border-t border-gray-800 bg-gray-900/50 backdrop-blur-sm p-6">
@@ -154,21 +144,17 @@ function App() {
             {/* Suggested Prompts */}
             <div className="mt-4 flex flex-wrap gap-2">
               {[
-                'Hi, I\'m John from TechFlow Solutions',
-                'What makes your platform different?',
-                'I need to automate our sales process',
-                'Tell me about pricing',
-                'I\'m a sales manager looking for efficiency'
+                "What does SalesFusion do?",
+                "How does the AI work?",
+                "Tell me about pricing",
+                "I want to automate my sales",
+                "Book a demo"
               ].map((prompt) => (
                 <button
                   key={prompt}
-                  onClick={() => {
-                    setInputMessage(prompt);
-                    setTimeout(() => {
-                      if (prompt === inputMessage) handleSendMessage();
-                    }, 100);
-                  }}
-                  className="text-sm bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white px-4 py-2 rounded-2xl border border-gray-700 hover:border-gray-600 transition-all duration-200"
+                  onClick={() => handlePromptClick(prompt)}
+                  disabled={isTyping}
+                  className="text-sm bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-300 hover:text-white px-4 py-2 rounded-2xl border border-gray-700 hover:border-gray-600 transition-all duration-200"
                 >
                   {prompt}
                 </button>

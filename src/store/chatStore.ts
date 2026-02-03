@@ -1,473 +1,167 @@
 import { create } from 'zustand';
-import { v4 as uuidv4 } from 'uuid';
-import type { 
-  Message, 
-  Conversation, 
-  ProspectInfo, 
-  QualificationStatus, 
-  BrandConfig, 
-  SalesRep,
-  AvailabilityStatus,
-  HandoffConfig
-} from '../types';
-import { qualificationService } from '../services/qualificationService';
-import { handoffService } from '../services/handoffService';
-import { transcriptService } from '../services/transcriptService';
-import { crmService } from '../services/crmService';
+import { sendMessage } from '../services/chatService';
 
-interface ChatStore {
-  // State
-  conversation: Conversation;
-  isTyping: boolean;
-  isQualified: boolean;
-  showConnectOption: boolean;
-  availabilityStatus: AvailabilityStatus;
-  assignedRep: SalesRep | null;
-  handoffConfig: HandoffConfig | null;
-  brandConfig: BrandConfig | null;
-  autoSaveEnabled: boolean;
-  lastSaved: Date | null;
-  
-  // Multi-session support
-  sessionHistory: string[]; // Recent session IDs for this prospect
-  
-  // Actions
-  addMessage: (content: string, role: 'user' | 'assistant', metadata?: Message['metadata']) => void;
-  updateProspectInfo: (info: Partial<ProspectInfo>) => void;
-  updateQualificationStatus: (status: Partial<QualificationStatus>) => void;
-  processQualificationFromMessages: () => Promise<void>;
-  checkRepAvailability: () => Promise<void>;
-  initiateHandoff: () => Promise<boolean>;
-  setTyping: (typing: boolean) => void;
-  setBrandConfig: (config: BrandConfig) => void;
-  setHandoffConfig: (config: HandoffConfig) => void;
-  setAssignedRep: (rep: SalesRep | null) => void;
-  clearConversation: () => void;
-  
-  // Transcript & Multi-session
-  saveTranscript: () => Promise<void>;
-  loadConversation: (sessionId: string) => Promise<boolean>;
-  continueConversationByEmail: (email: string) => Promise<boolean>;
-  generateSummary: () => Promise<void>;
-  syncToCRM: () => Promise<boolean>;
-  setAutoSave: (enabled: boolean) => void;
-  
-  // Computed
-  getQualificationScore: () => number;
-  isReadyToConnect: () => boolean;
-  canTalkNow: () => boolean;
-  hasUnsavedChanges: () => boolean;
+interface Message {
+  id: string;
+  content: string;
+  role: 'user' | 'assistant';
+  timestamp: Date;
 }
 
-const initialProspect: ProspectInfo = {
-  id: uuidv4(),
-  painPoints: [],
-};
+interface ProspectInfo {
+  name: string;
+  company: string;
+  email: string;
+}
 
-const initialQualification: QualificationStatus = qualificationService.initializeQualificationStatus();
-
-const initialAvailability: AvailabilityStatus = {
-  status: 'offline',
-  lastUpdated: new Date()
-};
-
-const initialConversation: Conversation = {
-  id: uuidv4(),
-  sessionId: uuidv4(),
-  messages: [],
-  prospect: initialProspect,
-  qualificationStatus: initialQualification,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-};
-
-export const useChatStore = create<ChatStore>((set, get) => ({
-  // Initial state
-  conversation: initialConversation,
-  isTyping: false,
-  isQualified: false,
-  showConnectOption: false,
-  availabilityStatus: initialAvailability,
-  assignedRep: null,
-  handoffConfig: null,
-  brandConfig: null,
-  autoSaveEnabled: true,
-  lastSaved: null,
-  sessionHistory: [],
+interface ChatStore {
+  messages: Message[];
+  isTyping: boolean;
+  sessionId: string | null;
+  prospectInfo: ProspectInfo;
+  isQualified: boolean;
+  error: string | null;
   
   // Actions
-  
-  updateProspectInfo: (info: Partial<ProspectInfo>) => {
-    set((state) => ({
-      conversation: {
-        ...state.conversation,
-        prospect: {
-          ...state.conversation.prospect,
-          ...info,
-        },
-        updatedAt: new Date(),
-      },
-    }));
-  },
-  
-  updateQualificationStatus: (status: Partial<QualificationStatus>) => {
-    set((state) => {
-      const newQualificationStatus = {
-        ...state.conversation.qualificationStatus,
-        ...status,
-      };
-      
-      // Calculate score using the qualification service
-      newQualificationStatus.score = qualificationService.calculateScore(newQualificationStatus);
-      newQualificationStatus.readyToConnect = newQualificationStatus.score >= (state.handoffConfig?.scoreThresholdForHandoff || 75);
-      
-      return {
-        conversation: {
-          ...state.conversation,
-          qualificationStatus: newQualificationStatus,
-          updatedAt: new Date(),
-        },
-        isQualified: newQualificationStatus.score >= 50,
-        showConnectOption: newQualificationStatus.readyToConnect,
-      };
-    });
-  },
+  sendUserMessage: (content: string) => Promise<void>;
+  setProspectInfo: (info: Partial<ProspectInfo>) => void;
+  clearChat: () => void;
+}
 
-  processQualificationFromMessages: async () => {
-    const state = get();
-    try {
-      const updatedStatus = await qualificationService.assessQualificationFromMessages(
-        state.conversation.messages,
-        state.conversation.qualificationStatus
-      );
-      
-      get().updateQualificationStatus(updatedStatus);
-      
-      // Check if we should trigger handoff
-      if (updatedStatus.readyToConnect && state.handoffConfig?.enableSlackNotifications) {
-        // Send Slack notification for qualified lead
-        setTimeout(() => {
-          handoffService.sendSlackNotification(get().conversation);
-        }, 1000); // Small delay to ensure state is updated
-      }
-    } catch (error) {
-      console.error('Failed to process qualification:', error);
-    }
-  },
-
-  checkRepAvailability: async () => {
-    const state = get();
-    if (!state.assignedRep) {
-      // Try to get the best available rep
-      try {
-        const repResult = await handoffService.getBestAvailableRep();
-        if (repResult) {
-          set({
-            assignedRep: repResult.rep,
-            availabilityStatus: repResult.availability
-          });
-        } else {
-          set({
-            availabilityStatus: {
-              status: 'offline',
-              lastUpdated: new Date()
-            }
-          });
-        }
-      } catch (error) {
-        console.error('Failed to check rep availability:', error);
-      }
-    } else {
-      // Check specific rep availability
-      try {
-        const availability = await handoffService.getRepAvailability(state.assignedRep.id);
-        set({ availabilityStatus: availability });
-      } catch (error) {
-        console.error('Failed to check assigned rep availability:', error);
-      }
-    }
-  },
-
-  initiateHandoff: async () => {
-    const state = get();
-    try {
-      // Save transcript before handoff
-      await get().saveTranscript();
-      
-      // Send Slack notification
-      const notificationSent = await handoffService.sendSlackNotification(state.conversation);
-      
-      if (notificationSent) {
-        // Update UI to show handoff initiated
-        set({
-          showConnectOption: false,
-          isTyping: true
-        });
-        
-        // Add a message about the handoff
-        get().addMessage(
-          "Great! I've notified our sales team about your interest. A team member will be in touch shortly to continue the conversation.",
-          'assistant'
-        );
-        
-        // Auto-sync to CRM if configured
-        if (state.handoffConfig?.enableSlackNotifications) {
-          setTimeout(() => {
-            get().syncToCRM();
-          }, 1000);
-        }
-        
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('Failed to initiate handoff:', error);
-      return false;
-    }
-  },
-  
-  setTyping: (typing: boolean) => {
-    set({ isTyping: typing });
-  },
-  
-  setBrandConfig: (config: BrandConfig) => {
-    set({ brandConfig: config });
-    // Apply brand colors to CSS variables (only in browser)
-    if (typeof document !== 'undefined') {
-      document.documentElement.style.setProperty('--primary-500', config.branding.colors.primary);
-      document.documentElement.style.setProperty('--secondary-500', config.branding.colors.secondary);
-      document.documentElement.style.setProperty('--accent-500', config.branding.colors.accent);
-    }
-  },
-
-  setHandoffConfig: (config: HandoffConfig) => {
-    set({ handoffConfig: config });
-    handoffService.updateConfig(config);
-  },
-
-  setAssignedRep: (rep: SalesRep | null) => {
-    set({ assignedRep: rep });
-  },
-
-  // Auto-save transcript after each message
-  addMessage: (content: string, role: 'user' | 'assistant', metadata?: Message['metadata']) => {
-    const message: Message = {
-      id: uuidv4(),
-      content,
-      role,
+export const useChatStore = create<ChatStore>((set, get) => ({
+  messages: [
+    {
+      id: '1',
+      content: "Hi! I'm here to help you learn about our AI sales platform. What brings you here today?",
+      role: 'assistant',
       timestamp: new Date(),
-      metadata,
+    }
+  ],
+  isTyping: false,
+  sessionId: null,
+  prospectInfo: {
+    name: '',
+    company: '',
+    email: '',
+  },
+  isQualified: false,
+  error: null,
+  
+  sendUserMessage: async (content: string) => {
+    const state = get();
+    
+    // Add user message immediately
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      content,
+      role: 'user',
+      timestamp: new Date(),
     };
     
-    set((state) => ({
-      conversation: {
-        ...state.conversation,
-        messages: [...state.conversation.messages, message],
-        updatedAt: new Date(),
-      },
+    set(s => ({
+      messages: [...s.messages, userMessage],
+      isTyping: true,
+      error: null,
     }));
-
-    // Auto-save after message if enabled
-    if (get().autoSaveEnabled) {
-      setTimeout(() => get().saveTranscript(), 500);
-    }
-  },
-
-  // Save current conversation as transcript
-  saveTranscript: async () => {
-    const state = get();
+    
     try {
-      const storedConversation = await transcriptService.storeConversation(state.conversation);
+      // Build context from conversation history
+      const previousMessages = state.messages.map(m => ({
+        role: m.role,
+        content: m.content,
+      }));
       
-      set({ 
-        lastSaved: new Date(),
-        conversation: {
-          ...state.conversation,
-          id: storedConversation.id // Update with storage ID
-        }
+      // Call API
+      const response = await sendMessage(content, state.sessionId, {
+        prospectName: state.prospectInfo.name,
+        company: state.prospectInfo.company,
+        email: state.prospectInfo.email,
+        previousMessages,
       });
       
-      console.log('Transcript saved successfully');
+      // Add AI response
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: response.response,
+        role: 'assistant',
+        timestamp: new Date(),
+      };
+      
+      set(s => ({
+        messages: [...s.messages, aiMessage],
+        isTyping: false,
+        sessionId: response.sessionId,
+      }));
+      
+      // Extract prospect info from conversation if mentioned
+      extractProspectInfo(content, set);
+      
     } catch (error) {
-      console.error('Failed to save transcript:', error);
+      console.error('Failed to send message:', error);
+      set({
+        isTyping: false,
+        error: error instanceof Error ? error.message : 'Failed to send message',
+      });
     }
-  },
-
-  // Load existing conversation by session ID
-  loadConversation: async (sessionId: string) => {
-    try {
-      const storedConversation = transcriptService.getConversationBySessionId(sessionId);
-      
-      if (storedConversation) {
-        set({
-          conversation: storedConversation,
-          isQualified: storedConversation.qualificationStatus.score >= 50,
-          showConnectOption: storedConversation.qualificationStatus.readyToConnect,
-          lastSaved: new Date()
-        });
-        
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('Failed to load conversation:', error);
-      return false;
-    }
-  },
-
-  // Continue conversation for returning prospect by email
-  continueConversationByEmail: async (email: string) => {
-    try {
-      const conversations = transcriptService.getConversationsByProspect(email);
-      
-      if (conversations.length > 0) {
-        // Get the most recent conversation
-        const latestConversation = conversations[0];
-        
-        // Create new session but carry over prospect info and history
-        const newConversation: Conversation = {
-          id: uuidv4(),
-          sessionId: uuidv4(),
-          messages: [],
-          prospect: latestConversation.prospect, // Keep prospect info
-          qualificationStatus: latestConversation.qualificationStatus, // Keep qualification
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-
-        set({
-          conversation: newConversation,
-          isQualified: latestConversation.qualificationStatus.score >= 50,
-          showConnectOption: latestConversation.qualificationStatus.readyToConnect,
-          sessionHistory: conversations.map(c => c.sessionId),
-          lastSaved: null
-        });
-
-        // Add welcome back message
-        get().addMessage(
-          `Welcome back! I see we spoke before about ${latestConversation.prospect.company ? `your work at ${latestConversation.prospect.company}` : 'your business needs'}. How can I help you today?`,
-          'assistant',
-          { type: 'general' }
-        );
-
-        return true;
-      }
-
-      return false;
-    } catch (error) {
-      console.error('Failed to continue conversation:', error);
-      return false;
-    }
-  },
-
-  // Generate AI summary
-  generateSummary: async () => {
-    const state = get();
-    try {
-      await transcriptService.generateSummary(state.conversation);
-      console.log('Summary generated successfully');
-    } catch (error) {
-      console.error('Failed to generate summary:', error);
-    }
-  },
-
-  // Sync to CRM
-  syncToCRM: async () => {
-    const state = get();
-    try {
-      // Ensure transcript is saved first
-      await get().saveTranscript();
-      
-      // Generate summary if needed
-      let summary = transcriptService.getSummary(state.conversation.sessionId);
-      if (!summary) {
-        summary = await transcriptService.generateSummary(state.conversation);
-      }
-      
-      // Get stored conversation (with tags)
-      const storedConversation = transcriptService.getConversationBySessionId(state.conversation.sessionId);
-      if (!storedConversation) {
-        throw new Error('Conversation not found in storage');
-      }
-
-      // Sync to CRM
-      const result = await crmService.syncConversation(storedConversation, summary);
-      
-      if (result.success) {
-        // Update conversation as synced
-        const updatedConversation = {
-          ...storedConversation,
-          crmSynced: true,
-          crmId: result.crmId
-        };
-        
-        await transcriptService.storeConversation(updatedConversation);
-        console.log('Successfully synced to CRM:', result.crmId);
-        return true;
-      } else {
-        console.error('CRM sync failed:', result.error);
-        return false;
-      }
-    } catch (error) {
-      console.error('Failed to sync to CRM:', error);
-      return false;
-    }
-  },
-
-  // Enable/disable auto-save
-  setAutoSave: (enabled: boolean) => {
-    set({ autoSaveEnabled: enabled });
   },
   
-  clearConversation: () => {
+  setProspectInfo: (info: Partial<ProspectInfo>) => {
+    set(s => ({
+      prospectInfo: { ...s.prospectInfo, ...info },
+    }));
+  },
+  
+  clearChat: () => {
     set({
-      conversation: {
-        ...initialConversation,
-        id: uuidv4(),
-        sessionId: uuidv4(),
-        createdAt: new Date(),
-      },
+      messages: [
+        {
+          id: '1',
+          content: "Hi! I'm here to help you learn about our AI sales platform. What brings you here today?",
+          role: 'assistant',
+          timestamp: new Date(),
+        }
+      ],
+      sessionId: null,
       isQualified: false,
-      showConnectOption: false,
+      error: null,
     });
-  },
-  
-  // Computed getters
-  getQualificationScore: () => {
-    return get().conversation.qualificationStatus.score;
-  },
-  
-  isReadyToConnect: () => {
-    return get().conversation.qualificationStatus.readyToConnect;
-  },
-
-  canTalkNow: () => {
-    const state = get();
-    return state.isReadyToConnect() && 
-           state.availabilityStatus.status === 'available' &&
-           state.handoffConfig?.enableTalkNow === true;
-  },
-
-  hasUnsavedChanges: () => {
-    const state = get();
-    if (!state.lastSaved) return state.conversation.messages.length > 0;
-    return state.conversation.updatedAt > state.lastSaved;
   },
 }));
 
-// Selector hooks for performance
-export const useMessages = () => useChatStore(state => state.conversation.messages);
-export const useProspectInfo = () => useChatStore(state => state.conversation.prospect);
-export const useQualificationStatus = () => useChatStore(state => state.conversation.qualificationStatus);
-export const useIsTyping = () => useChatStore(state => state.isTyping);
-export const useBrandConfig = () => useChatStore(state => state.brandConfig);
-export const useAvailabilityStatus = () => useChatStore(state => state.availabilityStatus);
-export const useAssignedRep = () => useChatStore(state => state.assignedRep);
-export const useHandoffConfig = () => useChatStore(state => state.handoffConfig);
-export const useCanTalkNow = () => useChatStore(state => state.canTalkNow());
-export const useSessionHistory = () => useChatStore(state => state.sessionHistory);
-export const useAutoSaveEnabled = () => useChatStore(state => state.autoSaveEnabled);
-export const useLastSaved = () => useChatStore(state => state.lastSaved);
-export const useHasUnsavedChanges = () => useChatStore(state => state.hasUnsavedChanges());
+// Helper to extract prospect info from messages
+function extractProspectInfo(
+  message: string,
+  set: (fn: (s: ChatStore) => Partial<ChatStore>) => void
+) {
+  const lowerMessage = message.toLowerCase();
+  
+  // Extract name
+  const nameMatch = message.match(/(?:i'm |my name is |i am )([A-Z][a-z]+ ?[A-Z]?[a-z]*)/i);
+  if (nameMatch) {
+    set(s => ({
+      prospectInfo: { ...s.prospectInfo, name: nameMatch[1].trim() },
+    }));
+  }
+  
+  // Extract company
+  const companyMatch = message.match(/(?:work at |work for |company is |at )([A-Z][a-zA-Z0-9 ]+)/i);
+  if (companyMatch) {
+    set(s => ({
+      prospectInfo: { ...s.prospectInfo, company: companyMatch[1].trim() },
+    }));
+  }
+  
+  // Extract email
+  const emailMatch = message.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+  if (emailMatch) {
+    set(s => ({
+      prospectInfo: { ...s.prospectInfo, email: emailMatch[1] },
+    }));
+  }
+}
+
+// Selector hooks for components
+export const useMessages = () => useChatStore(s => s.messages);
+export const useIsTyping = () => useChatStore(s => s.isTyping);
+export const useProspectInfo = () => useChatStore(s => s.prospectInfo);
+export const useError = () => useChatStore(s => s.error);
