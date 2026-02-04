@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { sendMessage } from '../services/chatService';
+import { qualificationService } from '../services/qualificationService';
+import type { QualificationStatus } from '../types';
 
 interface Message {
   id: string;
@@ -20,6 +22,8 @@ interface ChatStore {
   sessionId: string | null;
   prospectInfo: ProspectInfo;
   isQualified: boolean;
+  qualificationScore: number;
+  qualificationStatus: QualificationStatus;
   error: string | null;
   
   // Actions
@@ -45,11 +49,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     email: '',
   },
   isQualified: false,
+  qualificationScore: 0,
+  qualificationStatus: qualificationService.initializeQualificationStatus(),
   error: null,
   
   sendUserMessage: async (content: string) => {
-    const state = get();
-    
     // Add user message immediately
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -63,8 +67,34 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       isTyping: true,
       error: null,
     }));
+
+    const updateQualificationStatus = async () => {
+      const currentState = get();
+      try {
+        const updated = await qualificationService.assessQualificationFromMessages(
+          currentState.messages,
+          currentState.qualificationStatus
+        );
+
+        set(s => {
+          const nextStatus = { ...s.qualificationStatus, ...updated };
+          const nextScore = typeof updated.score === 'number' ? updated.score : nextStatus.score;
+          return {
+            qualificationStatus: nextStatus,
+            qualificationScore: nextScore,
+            isQualified: nextScore >= 75,
+          };
+        });
+      } catch (qualificationError) {
+        console.warn('Failed to update qualification status:', qualificationError);
+      }
+    };
+
+    await updateQualificationStatus();
     
     try {
+      const state = get();
+
       // Build context from conversation history
       const previousMessages = state.messages.map(m => ({
         role: m.role,
@@ -92,6 +122,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         isTyping: false,
         sessionId: response.sessionId,
       }));
+
+      await updateQualificationStatus();
       
       // Extract prospect info from conversation if mentioned
       extractProspectInfo(content, set);
@@ -123,6 +155,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       ],
       sessionId: null,
       isQualified: false,
+      qualificationScore: 0,
+      qualificationStatus: qualificationService.initializeQualificationStatus(),
       error: null,
     });
   },
@@ -164,4 +198,5 @@ function extractProspectInfo(
 export const useMessages = () => useChatStore(s => s.messages);
 export const useIsTyping = () => useChatStore(s => s.isTyping);
 export const useProspectInfo = () => useChatStore(s => s.prospectInfo);
+export const useQualificationScore = () => useChatStore(s => s.qualificationScore);
 export const useError = () => useChatStore(s => s.error);

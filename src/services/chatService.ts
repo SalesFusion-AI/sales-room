@@ -2,6 +2,8 @@
  * Chat Service - Connects Sales Room to Pipeline Bot AI
  */
 
+import { useSettingsStore } from '../store/settingsStore';
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 interface ChatContext {
@@ -24,6 +26,8 @@ export async function sendMessage(
   context: ChatContext
 ): Promise<ChatResponse> {
   try {
+    const { aiModel, aiApiKey } = useSettingsStore.getState();
+
     const response = await fetch(`${API_URL}/api/chat`, {
       method: 'POST',
       headers: {
@@ -33,15 +37,24 @@ export async function sendMessage(
         message,
         sessionId,
         context,
+        model: aiModel,
+        apiKey: aiApiKey,
       }),
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Chat request failed');
+    let data: ChatResponse | { error?: string };
+
+    try {
+      data = await response.json();
+    } catch (parseError) {
+      throw new Error('Invalid JSON response from chat service');
     }
 
-    return await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Chat request failed');
+    }
+
+    return data as ChatResponse;
   } catch (error) {
     console.error('Chat service error:', error);
     

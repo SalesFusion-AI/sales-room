@@ -173,15 +173,15 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
   }
 
   return (
-    <div className="max-w-6xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
+    <div className="max-w-6xl mx-3 sm:mx-4 lg:mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold mb-2">
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold mb-2 truncate">
               {conversation.prospect.name || 'Anonymous Prospect'}
             </h1>
-            <div className="flex items-center space-x-4 text-sm opacity-90">
+            <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm opacity-90">
               <div className="flex items-center space-x-1">
                 <Calendar className="w-4 h-4" />
                 <span>{conversation.createdAt.toLocaleDateString()}</span>
@@ -202,22 +202,22 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
           </div>
           
           {showActions && (
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={handleExport}
-                className="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-md flex items-center space-x-1 transition-colors"
+                className="min-h-[44px] bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-md flex items-center space-x-1 transition-colors"
               >
                 <Download className="w-4 h-4" />
                 <span>Export</span>
               </button>
-              <button className="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-md flex items-center space-x-1 transition-colors">
+              <button className="min-h-[44px] bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-md flex items-center space-x-1 transition-colors">
                 <Share className="w-4 h-4" />
                 <span>Share</span>
               </button>
               {onClose && (
                 <button
                   onClick={onClose}
-                  className="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-md transition-colors"
+                  className="min-h-[44px] bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-md transition-colors"
                 >
                   Close
                 </button>
@@ -239,9 +239,9 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
         </div>
       </div>
 
-      <div className="flex h-[600px]">
+      <div className="flex flex-col md:flex-row md:h-[600px]">
         {/* Left Panel - Summary & Info */}
-        <div className="w-1/3 border-r border-gray-200 overflow-y-auto bg-gray-50">
+        <div className="w-full md:w-1/3 border-b md:border-b-0 md:border-r border-gray-200 overflow-y-auto bg-gray-50">
           <div className="p-4 space-y-4">
             
             {/* Prospect Info */}
