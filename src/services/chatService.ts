@@ -36,12 +36,19 @@ export async function sendMessage(
       }),
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Chat request failed');
+    let data: ChatResponse | { error?: string };
+
+    try {
+      data = await response.json();
+    } catch (parseError) {
+      throw new Error('Invalid JSON response from chat service');
     }
 
-    return await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Chat request failed');
+    }
+
+    return data as ChatResponse;
   } catch (error) {
     console.error('Chat service error:', error);
     

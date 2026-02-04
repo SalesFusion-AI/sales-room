@@ -3,7 +3,7 @@ import { Send, MessageSquare, User, AlertCircle } from 'lucide-react';
 import { useChatStore, useMessages, useIsTyping, useProspectInfo, useError } from './store/chatStore';
 
 function App() {
-  const { sendUserMessage } = useChatStore();
+  const sendUserMessage = useChatStore(s => s.sendUserMessage);
   const messages = useMessages();
   const isTyping = useIsTyping();
   const prospectInfo = useProspectInfo();
@@ -24,7 +24,7 @@ function App() {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
@@ -127,7 +127,8 @@ function App() {
                 type="text"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyDown={handleKeyDown}
+                maxLength={500}
                 placeholder="Type your message..."
                 className="flex-1 bg-gray-800 border border-gray-700 rounded-2xl px-4 py-3.5 text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
                 disabled={isTyping}

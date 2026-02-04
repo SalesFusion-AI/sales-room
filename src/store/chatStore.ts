@@ -48,8 +48,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   error: null,
   
   sendUserMessage: async (content: string) => {
-    const state = get();
-    
     // Add user message immediately
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -65,6 +63,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }));
     
     try {
+      const state = get();
+
       // Build context from conversation history
       const previousMessages = state.messages.map(m => ({
         role: m.role,
