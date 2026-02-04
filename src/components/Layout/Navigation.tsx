@@ -22,7 +22,8 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) =>
       <div className="lg:hidden fixed top-4 left-4 z-50">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="bg-white shadow-lg rounded-lg p-2 text-gray-600 hover:text-gray-900"
+          className="bg-white shadow-lg rounded-lg p-3 min-h-[44px] min-w-[44px] text-gray-600 hover:text-gray-900"
+          aria-label="Toggle navigation"
         >
           {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
@@ -56,7 +57,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) =>
                         setIsOpen(false); // Close mobile menu
                       }}
                       className={`
-                        w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors
+                        w-full flex items-center space-x-3 px-3 py-3 min-h-[44px] rounded-lg text-left transition-colors
                         ${isActive 
                           ? 'bg-blue-50 text-blue-700 border border-blue-200' 
                           : 'text-gray-700 hover:bg-gray-100'

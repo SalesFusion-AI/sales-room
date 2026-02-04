@@ -2,6 +2,8 @@
  * Chat Service - Connects Sales Room to Pipeline Bot AI
  */
 
+import { useSettingsStore } from '../store/settingsStore';
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 interface ChatContext {
@@ -24,6 +26,8 @@ export async function sendMessage(
   context: ChatContext
 ): Promise<ChatResponse> {
   try {
+    const { aiModel, aiApiKey } = useSettingsStore.getState();
+
     const response = await fetch(`${API_URL}/api/chat`, {
       method: 'POST',
       headers: {
@@ -33,6 +37,8 @@ export async function sendMessage(
         message,
         sessionId,
         context,
+        model: aiModel,
+        apiKey: aiApiKey,
       }),
     });
 
