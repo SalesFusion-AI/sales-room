@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { getSessionItem, setSessionItem } from '../utils/sessionStorage';
 
 const MODEL_KEY = 'salesroom_ai_model';
 const API_KEY = 'salesroom_ai_api_key';
@@ -10,10 +11,10 @@ const getStoredValue = (key: string, fallback: string) => {
   }
 
   try {
-    const stored = localStorage.getItem(key);
+    const stored = getSessionItem(key);
     return stored ?? fallback;
   } catch (error) {
-    console.warn(`Failed to access localStorage key: ${key}`, error);
+    console.warn(`Failed to access sessionStorage key: ${key}`, error);
     return fallback;
   }
 };
@@ -24,9 +25,9 @@ const setStoredValue = (key: string, value: string) => {
   }
 
   try {
-    localStorage.setItem(key, value);
+    setSessionItem(key, value);
   } catch (error) {
-    console.warn(`Failed to set localStorage key: ${key}`, error);
+    console.warn(`Failed to set sessionStorage key: ${key}`, error);
   }
 };
 

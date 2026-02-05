@@ -16,6 +16,7 @@ import {
   Building
 } from 'lucide-react';
 import { demoService } from '../../demo/demoService';
+import { getSessionItem } from '../../utils/sessionStorage';
 
 interface OnboardingStep {
   id: string;
@@ -108,7 +109,7 @@ const OnboardingWizard: React.FC = () => {
     
     // Load demo onboarding data if available
     if (demoService.isDemoActive()) {
-      const demoOnboarding = localStorage.getItem('demo_onboarding');
+      const demoOnboarding = getSessionItem('demo_onboarding');
       if (demoOnboarding) {
         const demoData = JSON.parse(demoOnboarding);
         // Pre-populate with demo data
