@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { X, CheckCircle2, AlertCircle, Play } from 'lucide-react';
 import { useSettingsStore } from '../../store/settingsStore';
-import { demoService } from '../../demo/demoService';
+import { useChatStore } from '../../store/chatStore';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -19,6 +19,7 @@ interface SettingsPanelProps {
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
   const { aiModel, aiApiKey, setAiModel, setApiKey } = useSettingsStore();
+  const { loadDemoScenario } = useChatStore();
   const [draftModel, setDraftModel] = useState(aiModel);
   const [draftKey, setDraftKey] = useState(aiApiKey);
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -77,8 +78,17 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
     setStatus(null);
 
     try {
-      await demoService.initializeDemoEnvironment();
-      setStatus({ type: 'success', message: 'Demo scenarios loaded! Navigate to Transcripts to see sample conversations.' });
+      await loadDemoScenario();
+
+      setStatus({
+        type: 'success',
+        message: 'Hot lead demo loaded! You can now demo the qualification flow. Check Transcripts for more scenarios.',
+      });
+
+      // Auto-close settings panel after successful load
+      setTimeout(() => {
+        onClose();
+      }, 2000);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load demo scenarios.';
       setStatus({ type: 'error', message });
@@ -166,7 +176,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
             type="button"
             onClick={handleLoadDemo}
             disabled={isLoadingDemo}
-            className="w-full rounded-xl border border-amber-600 bg-amber-600/10 px-4 py-3 text-sm font-medium text-amber-200 transition hover:border-amber-500 hover:bg-amber-600/20 disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-center gap-2"
+            className="w-full rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-sm font-medium text-gray-200 transition hover:border-gray-600 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-center gap-2"
           >
             <Play className="h-4 w-4" />
             {isLoadingDemo ? 'Loading demo scenarios...' : 'Load Demo Scenario'}

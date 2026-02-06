@@ -38,6 +38,7 @@ interface ChatStore {
   sendUserMessage: (content: string) => Promise<void>;
   setProspectInfo: (info: Partial<ProspectInfo>) => void;
   clearChat: () => void;
+  loadDemoScenario: () => Promise<void>;
 }
 
 export const useChatStore = create<ChatStore>((set, get) => ({
@@ -193,6 +194,72 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         painPoint: false,
         nameCompany: false,
         demoPricing: false,
+      },
+      error: null,
+    });
+  },
+
+  loadDemoScenario: async () => {
+    // Load the hot lead demo conversation (TechFlow Solutions)
+    const hotLeadMessages = [
+      {
+        id: 'demo-msg-1',
+        content: "Hi, I'm Sarah Chen, VP of Engineering at TechFlow Solutions. We're evaluating workflow automation for our dev-to-QA handoffs and your platform looks promising.",
+        role: 'user' as const,
+        timestamp: new Date(),
+      },
+      {
+        id: 'demo-msg-2',
+        content: 'Hi Sarah! Great to meet you. Dev-to-QA handoffs are a common bottleneck at your scale. What outcomes are you hoping to improve first - speed, quality, or visibility?',
+        role: 'assistant' as const,
+        timestamp: new Date(),
+      },
+      {
+        id: 'demo-msg-3',
+        content: "Speed and reliability. We have budget allocated for this quarter and need to choose a vendor by end of this month. I'm the decision maker for engineering tooling.",
+        role: 'user' as const,
+        timestamp: new Date(),
+      },
+      {
+        id: 'demo-msg-4',
+        content: 'Perfect - budget and timeline are exactly what we need to move fast. At 300 engineers, automating those handoffs typically cuts cycle time by 60-70%. What tools are you using today for release management?',
+        role: 'assistant' as const,
+        timestamp: new Date(),
+      },
+      {
+        id: 'demo-msg-5',
+        content: "We run Jira + GitHub + Jenkins. The handoff process is still manual and it's slowing every sprint. We want this live within 6 months.",
+        role: 'user' as const,
+        timestamp: new Date(),
+      },
+      {
+        id: 'demo-msg-6',
+        content: 'Great fit. We integrate directly with Jira, GitHub, and Jenkins and can be live in weeks. Want a tailored demo this week with our solutions engineer?',
+        role: 'assistant' as const,
+        timestamp: new Date(),
+      },
+    ];
+
+    await demoService.initializeDemoEnvironment();
+
+    set({
+      messages: hotLeadMessages,
+      isTyping: false,
+      sessionId: 'demo-session-001',
+      prospectInfo: {
+        name: 'Sarah Chen',
+        company: 'TechFlow Solutions',
+        email: 'sarah.chen@techflow.com',
+      },
+      isQualified: true,
+      qualificationScore: 92,
+      qualificationStatus: qualificationService.initializeQualificationStatus(),
+      demoQualificationSignals: {
+        budget: true,
+        timeline: true,
+        painPoint: true,
+        nameCompany: true,
+        demoPricing: true,
       },
       error: null,
     });
