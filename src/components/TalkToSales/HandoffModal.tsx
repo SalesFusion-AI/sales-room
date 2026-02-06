@@ -25,7 +25,7 @@ const statusStyles: Record<RepStatus, { label: string; className: string }> = {
 
 export default function HandoffModal({ open, onClose }: HandoffModalProps) {
   const [status, setStatus] = useState<RepStatus>('available');
-  const [calendlyLink, setCalendlyLink] = useState('https://calendly.com/your-team/15min');
+  const [calendlyLink, setCalendlyLink] = useState('https://calendly.com/salesfusion');
 
   const showSchedule = status !== 'available';
   const statusBadge = useMemo(() => statusStyles[status], [status]);
@@ -108,7 +108,7 @@ export default function HandoffModal({ open, onClose }: HandoffModalProps) {
                   type="url"
                   value={calendlyLink}
                   onChange={(event) => setCalendlyLink(event.target.value)}
-                  placeholder="https://calendly.com/your-team/15min"
+                  placeholder="https://calendly.com/salesfusion"
                   className="w-full rounded-2xl border border-gray-800 bg-gray-900 px-4 py-3 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                 />
               </label>

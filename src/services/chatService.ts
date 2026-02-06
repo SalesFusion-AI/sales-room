@@ -74,20 +74,40 @@ export async function sendMessage(
 // Demo fallback responses when API is not available
 function getDemoResponse(message: string): string {
   const lowerMessage = message.toLowerCase();
-  
-  if (lowerMessage.includes('pricing') || lowerMessage.includes('cost')) {
-    return "Our pricing is customized based on your needs. We typically work with companies doing $10k-$200k/month who want to scale without hiring. What's your current monthly revenue range?";
+
+  if (lowerMessage.includes('pricing') || lowerMessage.includes('cost') || lowerMessage.includes('price')) {
+    return "Great question. Most teams invest between $2k–$8k/mo depending on volume and complexity. We tailor it based on lead volume, channels, and the level of automation you want. Roughly how many inbound leads or demo requests do you handle each month?";
   }
-  
-  if (lowerMessage.includes('demo') || lowerMessage.includes('see it')) {
-    return "I'd love to show you how it works! Based on our conversation, I think you'd be a great fit. Should I connect you with our team for a personalized demo?";
+
+  if (lowerMessage.includes('budget') || lowerMessage.includes('roi')) {
+    return "Totally makes sense to sanity‑check ROI. Our customers usually see a 25–40% lift in qualified pipeline within the first 60–90 days. If you had to ballpark, what budget range feels realistic for solving this?";
   }
-  
-  if (lowerMessage.includes('how') && lowerMessage.includes('work')) {
-    return "We combine AI automation with human excellence. Our AI handles lead qualification, follow-ups, and meeting prep 24/7, while your team focuses on closing. Most clients see 2x revenue in 90 days. What's your biggest sales bottleneck right now?";
+
+  if (lowerMessage.includes('demo') || lowerMessage.includes('see it') || lowerMessage.includes('show me')) {
+    return "Absolutely — I can get you a tailored demo. If you'd like, you can grab a time here: https://calendly.com/salesfusion. Before we book, what would you want to see most (lead qualification, follow‑ups, or CRM sync)?";
   }
-  
-  return "That's interesting! Tell me more about your current sales process and what challenges you're facing. I'm here to help figure out if we're a good fit.";
+
+  if (lowerMessage.includes('timeline') || lowerMessage.includes('by ') || lowerMessage.includes('this quarter') || lowerMessage.includes('next month')) {
+    return "Got it. We typically onboard teams in 2–3 weeks, then optimize over the next month. When are you hoping to have something live?";
+  }
+
+  if (lowerMessage.includes('integrat') || lowerMessage.includes('crm') || lowerMessage.includes('salesforce') || lowerMessage.includes('hubspot')) {
+    return "We integrate with HubSpot, Salesforce, and most modern CRMs. Setup is usually a few hours with no heavy engineering lift. What CRM are you currently using?";
+  }
+
+  if (lowerMessage.includes('pain') || lowerMessage.includes('problem') || lowerMessage.includes('challenge') || lowerMessage.includes('struggl')) {
+    return "Thanks for sharing that. We see that a lot — especially when teams are scaling. If we could fix one thing first, would it be lead response time, qualification quality, or follow‑up consistency?";
+  }
+
+  if (lowerMessage.includes('how') && (lowerMessage.includes('work') || lowerMessage.includes('it works'))) {
+    return "We combine AI-led qualification with human‑ready handoffs. The AI engages leads instantly, asks smart discovery questions, and surfaces a qualified summary to your reps. Teams usually see faster response times and higher show rates. What's your biggest sales bottleneck right now?";
+  }
+
+  if (lowerMessage.includes("i'm ") || lowerMessage.includes('my name is')) {
+    return "Nice to meet you! What team are you on and what prompted you to look at SalesFusion today?";
+  }
+
+  return "Thanks for the context. To make sure we're a good fit, can I ask a couple quick questions about your lead volume and timeline?";
 }
 
 export default { sendMessage };

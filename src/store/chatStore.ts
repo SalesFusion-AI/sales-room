@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { sendMessage } from '../services/chatService';
 import { qualificationService } from '../services/qualificationService';
+import { demoService } from '../demo/demoService';
 import type { QualificationStatus } from '../types';
 
 interface Message {
@@ -24,6 +25,13 @@ interface ChatStore {
   isQualified: boolean;
   qualificationScore: number;
   qualificationStatus: QualificationStatus;
+  demoQualificationSignals: {
+    budget: boolean;
+    timeline: boolean;
+    painPoint: boolean;
+    nameCompany: boolean;
+    demoPricing: boolean;
+  };
   error: string | null;
   
   // Actions
@@ -51,6 +59,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   isQualified: false,
   qualificationScore: 0,
   qualificationStatus: qualificationService.initializeQualificationStatus(),
+  demoQualificationSignals: {
+    budget: false,
+    timeline: false,
+    painPoint: false,
+    nameCompany: false,
+    demoPricing: false,
+  },
   error: null,
   
   sendUserMessage: async (content: string) => {
@@ -68,7 +83,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       error: null,
     }));
 
-    const updateQualificationStatus = async () => {
+    const updateQualificationStatus = async (options?: { messageContent?: string; demoMode?: boolean }) => {
       const currentState = get();
       try {
         const updated = await qualificationService.assessQualificationFromMessages(
@@ -78,11 +93,25 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
         set(s => {
           const nextStatus = { ...s.qualificationStatus, ...updated };
-          const nextScore = typeof updated.score === 'number' ? updated.score : nextStatus.score;
+          const baseScore = typeof updated.score === 'number' ? updated.score : nextStatus.score;
+          let nextScore = baseScore;
+          let nextSignals = s.demoQualificationSignals;
+
+          if (options?.demoMode) {
+            const demoUpdate = getDemoQualificationUpdate(options.messageContent ?? '', s.demoQualificationSignals, s.prospectInfo);
+            nextSignals = demoUpdate.signals;
+            if (demoUpdate.increment > 0) {
+              nextScore = Math.min(100, Math.max(baseScore, s.qualificationScore) + demoUpdate.increment);
+            } else {
+              nextScore = Math.max(baseScore, s.qualificationScore);
+            }
+          }
+
           return {
             qualificationStatus: nextStatus,
             qualificationScore: nextScore,
             isQualified: nextScore >= 75,
+            demoQualificationSignals: nextSignals,
           };
         });
       } catch (qualificationError) {
@@ -123,7 +152,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         sessionId: response.sessionId,
       }));
 
-      await updateQualificationStatus();
+      const demoMode = demoService.isDemoActive() || isDemoSessionId(response.sessionId) || isDemoSessionId(state.sessionId);
+      await updateQualificationStatus({ messageContent: content, demoMode });
       
       // Extract prospect info from conversation if mentioned
       extractProspectInfo(content, set);
@@ -157,6 +187,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       isQualified: false,
       qualificationScore: 0,
       qualificationStatus: qualificationService.initializeQualificationStatus(),
+      demoQualificationSignals: {
+        budget: false,
+        timeline: false,
+        painPoint: false,
+        nameCompany: false,
+        demoPricing: false,
+      },
       error: null,
     });
   },
@@ -193,6 +230,53 @@ function extractProspectInfo(
     }));
   }
 }
+
+const isDemoSessionId = (sessionId: string | null): boolean => {
+  if (!sessionId) return false;
+  return sessionId.startsWith('demo_') || sessionId.startsWith('demo-session');
+};
+
+const getDemoQualificationUpdate = (
+  message: string,
+  signals: ChatStore['demoQualificationSignals'],
+  prospectInfo: ProspectInfo
+) => {
+  const lowerMessage = message.toLowerCase();
+  let increment = 0;
+  const nextSignals = { ...signals };
+
+  if (!signals.budget && /budget|pricing|price|cost|invest|roi|spend/.test(lowerMessage)) {
+    increment += 20;
+    nextSignals.budget = true;
+  }
+
+  if (!signals.timeline && /timeline|timeframe|next month|next quarter|this quarter|by\s\w+|asap|soon|weeks?/.test(lowerMessage)) {
+    increment += 15;
+    nextSignals.timeline = true;
+  }
+
+  if (!signals.painPoint && /pain|problem|challenge|struggl|manual|slow|inefficient|leads?\sfalling|response time/.test(lowerMessage)) {
+    increment += 15;
+    nextSignals.painPoint = true;
+  }
+
+  const nameCompanyMentioned =
+    /my name is|i'm |i am |we're |we are |at\s+[a-z0-9&\- ]+/i.test(message) ||
+    Boolean(prospectInfo.name) ||
+    Boolean(prospectInfo.company);
+
+  if (!signals.nameCompany && nameCompanyMentioned) {
+    increment += 10;
+    nextSignals.nameCompany = true;
+  }
+
+  if (!signals.demoPricing && /demo|pricing|quote|proposal|see it|trial/.test(lowerMessage)) {
+    increment += 15;
+    nextSignals.demoPricing = true;
+  }
+
+  return { increment, signals: nextSignals };
+};
 
 // Selector hooks for components
 export const useMessages = () => useChatStore(s => s.messages);
