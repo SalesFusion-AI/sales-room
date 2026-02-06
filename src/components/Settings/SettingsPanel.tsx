@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { X, CheckCircle2, AlertCircle, Play } from 'lucide-react';
 import { useSettingsStore } from '../../store/settingsStore';
+import { useChatStore } from '../../store/chatStore';
 import { demoService } from '../../demo/demoService';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -19,6 +20,7 @@ interface SettingsPanelProps {
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
   const { aiModel, aiApiKey, setAiModel, setApiKey } = useSettingsStore();
+  const { loadDemoScenario } = useChatStore();
   const [draftModel, setDraftModel] = useState(aiModel);
   const [draftKey, setDraftKey] = useState(aiApiKey);
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -77,8 +79,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
     setStatus(null);
 
     try {
+      // Initialize demo environment and load hot lead conversation
       await demoService.initializeDemoEnvironment();
-      setStatus({ type: 'success', message: 'Demo scenarios loaded! Navigate to Transcripts to see sample conversations.' });
+      loadDemoScenario();
+      
+      setStatus({ 
+        type: 'success', 
+        message: 'Hot lead demo loaded! You can now demo the qualification flow. Check Transcripts for more scenarios.' 
+      });
+      
+      // Auto-close settings panel after successful load
+      setTimeout(() => {
+        onClose();
+      }, 2000);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load demo scenarios.';
       setStatus({ type: 'error', message });
