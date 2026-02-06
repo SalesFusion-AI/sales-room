@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { X, CheckCircle2, AlertCircle } from 'lucide-react';
+import { X, CheckCircle2, AlertCircle, Play } from 'lucide-react';
 import { useSettingsStore } from '../../store/settingsStore';
+import { demoService } from '../../demo/demoService';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -22,6 +23,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
   const [draftKey, setDraftKey] = useState(aiApiKey);
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isTesting, setIsTesting] = useState(false);
+  const [isLoadingDemo, setIsLoadingDemo] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -67,6 +69,21 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
       setStatus({ type: 'error', message });
     } finally {
       setIsTesting(false);
+    }
+  };
+
+  const handleLoadDemo = async () => {
+    setIsLoadingDemo(true);
+    setStatus(null);
+
+    try {
+      await demoService.initializeDemoEnvironment();
+      setStatus({ type: 'success', message: 'Demo scenarios loaded! Navigate to Transcripts to see sample conversations.' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load demo scenarios.';
+      setStatus({ type: 'error', message });
+    } finally {
+      setIsLoadingDemo(false);
     }
   };
 
@@ -145,6 +162,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
         </div>
 
         <div className="flex flex-col gap-3 border-t border-gray-800 px-6 py-5">
+          <button
+            type="button"
+            onClick={handleLoadDemo}
+            disabled={isLoadingDemo}
+            className="w-full rounded-xl border border-amber-600 bg-amber-600/10 px-4 py-3 text-sm font-medium text-amber-200 transition hover:border-amber-500 hover:bg-amber-600/20 disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-center gap-2"
+          >
+            <Play className="h-4 w-4" />
+            {isLoadingDemo ? 'Loading demo scenarios...' : 'Load Demo Scenario'}
+          </button>
           <button
             type="button"
             onClick={handleTestConnection}

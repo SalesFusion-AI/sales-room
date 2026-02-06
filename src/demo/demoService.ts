@@ -106,9 +106,9 @@ Welcome to the SalesFusion Sales Room demo!
 • 23 calls booked
 
 🎭 Available Scenarios:
-1. Hot Lead: TechFlow Solutions (92% qualified)
-2. Warm Lead: GlobalManufacturing (67% qualified)  
-3. Cold Lead: EduTech Innovations (35% qualified)
+1. Hot Lead: TechFlow Solutions (94% qualified)
+2. Discovery Call: RetailGenius (64% qualified)
+3. Objection Handling: HealthFirst Medical (55% qualified)
 
 🚀 Webinar Mode: Use demoService.startWebinar() for presentation
     `;
@@ -136,8 +136,8 @@ ${WEBINAR_DEMO_SCRIPT.intro.keyPoints.map(point => `• ${point}`).join('\n')}
 📋 Demo Flow:
 1. Show Sales Room interface
 2. Navigate to Transcripts → Hot Lead (TechFlow)
-3. Review transcript and AI summary  
-4. Show CRM sync functionality
+3. Navigate to Transcripts → Discovery Call (RetailGenius)
+4. Navigate to Transcripts → Objection Handling (HealthFirst)
 5. Display analytics dashboard
 
 Use: nextStep() / prevStep() to navigate
@@ -175,17 +175,17 @@ Use: nextStep() / prevStep() to navigate
       {
         title: "Step 2: Hot Lead Scenario", 
         action: "Navigate to Transcripts → Select TechFlow Solutions",
-        highlight: "92% qualification score, ready to connect"
+        highlight: "94% qualification score, ready to connect"
       },
       {
-        title: "Step 3: Transcript Review",
-        action: "Show detailed conversation with AI insights",
-        highlight: "Key points, concerns, next steps automatically extracted"
+        title: "Step 3: Discovery Call",
+        action: "Navigate to Transcripts → Select RetailGenius",
+        highlight: "Curious questions + gaps in budget/authority"
       },
       {
-        title: "Step 4: CRM Integration",
-        action: "Demonstrate one-click sync to Salesforce",
-        highlight: "All conversation context preserved in CRM"
+        title: "Step 4: Objection Handling",
+        action: "Navigate to Transcripts → Select HealthFirst Medical",
+        highlight: "Compliance + cost objections captured"
       },
       {
         title: "Step 5: Analytics Dashboard",

@@ -62,56 +62,56 @@ export const DEMO_COMPANIES = [
 
 // Demo conversation scenarios
 export const DEMO_CONVERSATIONS: StoredConversation[] = [
-  // Hot Lead - TechFlow Solutions
+  // Hot Lead - TechFlow Solutions (VP Engineering, budget, ready to buy)
   {
     id: 'demo-conv-1',
     sessionId: 'demo-session-001',
     messages: [
       {
         id: 'msg-1-1',
-        content: "Hi! I'm Sarah from TechFlow Solutions. I saw your solution and I'm interested in learning more about how it could help automate our workflow processes.",
+        content: "Hi, I'm Sarah Chen, VP of Engineering at TechFlow Solutions. We're evaluating workflow automation for our dev-to-QA handoffs and your platform looks promising.",
         role: 'user',
         timestamp: new Date('2026-01-30T10:15:00'),
         metadata: { type: 'general' }
       },
       {
         id: 'msg-1-2', 
-        content: "Hi Sarah! Great to meet you. TechFlow Solutions - I see you're in software development. Workflow automation is exactly what we help companies like yours optimize. What specific workflow challenges are you facing that brought you here today?",
+        content: "Hi Sarah! Great to meet you. Dev-to-QA handoffs are a common bottleneck at your scale. What outcomes are you hoping to improve first - speed, quality, or visibility?",
         role: 'assistant',
         timestamp: new Date('2026-01-30T10:15:30'),
         metadata: { type: 'qualification' }
       },
       {
         id: 'msg-1-3',
-        content: "We're spending way too much time on manual handoffs between development and QA. Our team has grown to 250 people and the old processes just don't scale. We're looking at a 6-month timeline to implement something new, and we have budget allocated for this year.",
+        content: "Speed and reliability. We have budget allocated for this quarter and need to choose a vendor by end of this month. I'm the decision maker for engineering tooling.",
         role: 'user', 
         timestamp: new Date('2026-01-30T10:16:15'),
         metadata: { type: 'qualification' }
       },
       {
         id: 'msg-1-4',
-        content: "That's a perfect fit for what we do! With 250 people, you're at that critical scaling point where automation becomes essential. The dev-to-QA handoff is one of our most popular use cases. Since you have budget allocated and a 6-month timeline, I'd love to show you how we've helped companies like yours reduce handoff time by 70%. Would you like to see a demo tailored to your dev workflow?",
+        content: "Perfect - budget and timeline are exactly what we need to move fast. At 300 engineers, automating those handoffs typically cuts cycle time by 60-70%. What tools are you using today for release management?",
         role: 'assistant',
         timestamp: new Date('2026-01-30T10:17:00'),
         metadata: { type: 'general' }
       },
       {
         id: 'msg-1-5',
-        content: "Yes, absolutely! I'm the VP of Engineering so I can make decisions on this. A demo would be perfect. We're also looking at competitors, but if your solution fits our needs, we could move quickly.",
+        content: "We run Jira + GitHub + Jenkins. The handoff process is still manual and it's slowing every sprint. We want this live within 6 months.",
         role: 'user',
         timestamp: new Date('2026-01-30T10:17:45'),
         metadata: { type: 'qualification' }
       },
       {
         id: 'msg-1-6',
-        content: "Excellent! Having the decision maker involved makes this so much more efficient. I'd love to connect you with our solutions engineer who can walk through exactly how we'd integrate with your current dev stack. They have specific experience with companies your size in the software development space. What's your availability this week?",
+        content: "Great fit. We integrate directly with Jira, GitHub, and Jenkins and can be live in weeks. Want a tailored demo this week with our solutions engineer?",
         role: 'assistant',
         timestamp: new Date('2026-01-30T10:18:30'),
         metadata: { type: 'general' }
       },
       {
         id: 'msg-1-7',
-        content: "I'm free Thursday afternoon or Friday morning. My email is sarah.chen@techflow.com if that's easier for scheduling.",
+        content: "Yes, please. If it looks good, we can move ASAP. Thursday afternoon or Friday morning works.",
         role: 'user',
         timestamp: new Date('2026-01-30T10:19:00'),
         metadata: { type: 'general' }
@@ -126,8 +126,8 @@ export const DEMO_CONVERSATIONS: StoredConversation[] = [
       industry: 'Software Development',
       companySize: '250-500 employees',
       painPoints: ['Manual workflow processes', 'Dev-to-QA handoff inefficiencies', 'Scaling challenges'],
-      budget: 'Budget allocated for this year',
-      timeline: '6-month implementation timeline',
+      budget: 'Budget allocated for this quarter',
+      timeline: 'Vendor selection by end of month, live in 6 months',
       decisionMaker: true
     },
     qualificationStatus: {
@@ -140,7 +140,7 @@ export const DEMO_CONVERSATIONS: StoredConversation[] = [
           weight: 0.25,
           status: 'qualified',
           confidence: 0.95,
-          evidence: ['we have budget allocated for this year']
+          evidence: ['budget allocated for this quarter']
         },
         authority: {
           id: 'authority',
@@ -149,7 +149,7 @@ export const DEMO_CONVERSATIONS: StoredConversation[] = [
           weight: 0.25,
           status: 'qualified', 
           confidence: 0.9,
-          evidence: ["I'm the VP of Engineering so I can make decisions on this"]
+          evidence: ["I'm the decision maker for engineering tooling"]
         },
         need: {
           id: 'need',
@@ -158,7 +158,7 @@ export const DEMO_CONVERSATIONS: StoredConversation[] = [
           weight: 0.3,
           status: 'qualified',
           confidence: 0.95,
-          evidence: ['spending way too much time on manual handoffs', 'old processes just don\'t scale']
+          evidence: ['handoff process is still manual', 'slowing every sprint']
         },
         timeline: {
           id: 'timeline',
@@ -167,14 +167,14 @@ export const DEMO_CONVERSATIONS: StoredConversation[] = [
           weight: 0.2,
           status: 'qualified',
           confidence: 0.9,
-          evidence: ['6-month timeline to implement something new']
+          evidence: ['choose a vendor by end of this month', 'live within 6 months']
         }
       },
-      score: 92,
+      score: 94,
       readyToConnect: true,
       lastUpdated: new Date('2026-01-30T10:19:00')
     },
-    tags: [DEFAULT_LEAD_TAGS[0], DEFAULT_LEAD_TAGS[3]], // Hot Lead, Enterprise
+    tags: [DEFAULT_LEAD_TAGS[0], DEFAULT_LEAD_TAGS[3], DEFAULT_LEAD_TAGS[4]], // Hot Lead, Enterprise, Urgent
     crmSynced: true,
     crmId: 'SF_001_DEMO',
     lastActivity: new Date('2026-01-30T10:19:00'),
@@ -182,49 +182,49 @@ export const DEMO_CONVERSATIONS: StoredConversation[] = [
     updatedAt: new Date('2026-01-30T10:19:00')
   },
 
-  // Warm Lead - GlobalManufacturing Corp
+  // Discovery Call - RetailGenius Inc (curious, asking good questions)
   {
     id: 'demo-conv-2',
     sessionId: 'demo-session-002', 
     messages: [
       {
         id: 'msg-2-1',
-        content: "Hello, I'm Mike from GlobalManufacturing Corp. We're exploring solutions for supply chain visibility. Can you tell me more about your platform?",
+        content: "Hi, I'm Jordan Lee, Head of Growth at RetailGenius. I'm curious how SalesFusion works for e-commerce teams handling lots of inbound leads.",
         role: 'user',
         timestamp: new Date('2026-01-29T14:30:00'),
         metadata: { type: 'general' }
       },
       {
         id: 'msg-2-2',
-        content: "Hi Mike! GlobalManufacturing Corp - you're in the automotive manufacturing space, correct? Supply chain visibility is crucial for companies your size. What specific visibility challenges are you trying to solve?",
+        content: "Hi Jordan! Great to meet you. We help e-commerce teams qualify inbound leads faster and route the best buyers to sales. What are you hoping to improve first - qualification speed, conversion rate, or team capacity?",
         role: 'assistant',
         timestamp: new Date('2026-01-29T14:30:30'),
         metadata: { type: 'qualification' }
       },
       {
         id: 'msg-2-3',
-        content: "Yes, we manufacture automotive parts globally. Our main issue is we can't see bottlenecks until they become problems. We have plants in 12 countries and visibility across all of them is a nightmare. We're looking to implement something in the next 12-18 months.",
+        content: "All of the above. We're qualifying manually today and it's a bottleneck. How does your AI decide who's ready? And does it integrate with Shopify and Stripe?",
         role: 'user',
         timestamp: new Date('2026-01-29T14:31:30'),
         metadata: { type: 'qualification' }
       },
       {
         id: 'msg-2-4',
-        content: "That's a common challenge for global manufacturers. Real-time visibility across 12 countries is complex but absolutely achievable. Our platform has helped several automotive suppliers get end-to-end visibility. What's your role in the decision-making process for this kind of initiative?",
+        content: "Great questions. We score leads using your criteria and connect directly to Shopify + Stripe for commerce signals. What's your role in the decision process?",
         role: 'assistant',
         timestamp: new Date('2026-01-29T14:32:00'),
         metadata: { type: 'qualification' }
       },
       {
         id: 'msg-2-5',
-        content: "I'm the Director of Operations, but this decision would go through our procurement committee and ultimately need CEO approval since it's a significant investment. We're in early research phase right now.",
+        content: "I lead growth, but our COO will sign off. No budget set yet, but if the ROI is there we can find it. We'd aim to roll this out next quarter.",
         role: 'user',
         timestamp: new Date('2026-01-29T14:32:45'),
         metadata: { type: 'qualification' }
       },
       {
         id: 'msg-2-6',
-        content: "I understand - enterprise decisions like this require multiple stakeholders. Since you're in research phase, I can provide you with some case studies from similar automotive manufacturers and ROI data that might help with your internal discussions. What would be most valuable for your procurement committee?",
+        content: "Understood. I can share e-commerce case studies and a sample ROI model for your COO. Would you like a short discovery call to walk through fit and onboarding?",
         role: 'assistant',
         timestamp: new Date('2026-01-29T14:33:30'),
         metadata: { type: 'general' }
@@ -232,14 +232,14 @@ export const DEMO_CONVERSATIONS: StoredConversation[] = [
     ],
     prospect: {
       id: 'demo-prospect-2',
-      name: 'Mike Rodriguez',
-      email: 'mike.rodriguez@globalmanufacturing.com',
-      company: 'GlobalManufacturing Corp',
-      title: 'Director of Operations', 
-      industry: 'Manufacturing',
-      companySize: '1000+ employees',
-      painPoints: ['Supply chain visibility across 12 countries', 'Bottleneck detection', 'Global coordination'],
-      timeline: '12-18 months implementation',
+      name: 'Jordan Lee',
+      email: 'jordan.lee@retailgenius.com',
+      company: 'RetailGenius Inc',
+      title: 'Head of Growth', 
+      industry: 'E-commerce',
+      companySize: '50-100 employees',
+      painPoints: ['Manual lead qualification', 'Slow response times', 'Conversion rate pressure'],
+      timeline: 'Next quarter rollout',
       decisionMaker: false
     },
     qualificationStatus: {
@@ -251,8 +251,8 @@ export const DEMO_CONVERSATIONS: StoredConversation[] = [
           description: 'Has budget allocated or authority to allocate budget',
           weight: 0.25,
           status: 'unknown',
-          confidence: 0.3,
-          evidence: []
+          confidence: 0.4,
+          evidence: ['No budget set yet']
         },
         authority: {
           id: 'authority',
@@ -261,7 +261,7 @@ export const DEMO_CONVERSATIONS: StoredConversation[] = [
           weight: 0.25,
           status: 'unqualified',
           confidence: 0.8,
-          evidence: ['decision would go through procurement committee and need CEO approval']
+          evidence: ['our COO will sign off']
         },
         need: {
           id: 'need',
@@ -270,7 +270,7 @@ export const DEMO_CONVERSATIONS: StoredConversation[] = [
           weight: 0.3,
           status: 'qualified',
           confidence: 0.9,
-          evidence: ['visibility across all plants is a nightmare', 'can\'t see bottlenecks until they become problems']
+          evidence: ['qualifying manually today and it\'s a bottleneck']
         },
         timeline: {
           id: 'timeline',
@@ -278,71 +278,81 @@ export const DEMO_CONVERSATIONS: StoredConversation[] = [
           description: 'Has a defined timeframe for implementation',
           weight: 0.2,
           status: 'qualified',
-          confidence: 0.7,
-          evidence: ['12-18 months implementation']
+          confidence: 0.75,
+          evidence: ['roll this out next quarter']
         }
       },
-      score: 67,
+      score: 64,
       readyToConnect: false,
       lastUpdated: new Date('2026-01-29T14:33:30')
     },
-    tags: [DEFAULT_LEAD_TAGS[1], DEFAULT_LEAD_TAGS[3]], // Warm Lead, Enterprise  
+    tags: [DEFAULT_LEAD_TAGS[1]], // Warm Lead
     crmSynced: false,
     lastActivity: new Date('2026-01-29T14:33:30'),
     createdAt: new Date('2026-01-29T14:30:00'),
     updatedAt: new Date('2026-01-29T14:33:30')
   },
 
-  // Cold Lead - EduTech Innovations
+  // Objection Handling - HealthFirst Medical (skeptical, needs convincing)
   {
     id: 'demo-conv-3',
     sessionId: 'demo-session-003',
     messages: [
       {
         id: 'msg-3-1',
-        content: "Hi, I'm exploring different solutions for our education platform. What do you offer?",
+        content: "I'm Priya Nair, CTO at HealthFirst Medical. I'm skeptical about AI handling patient inquiries and sales conversations.",
         role: 'user',
         timestamp: new Date('2026-01-28T11:45:00'),
         metadata: { type: 'general' }
       },
       {
         id: 'msg-3-2',
-        content: "Hello! I'd love to help you explore how our platform could benefit your education company. What specific challenges are you looking to solve with your current platform?",
+        content: "Hi Priya, thanks for sharing that. Healthcare requires a high bar. What would make an AI assistant feel safe and reliable for your team?",
         role: 'assistant', 
         timestamp: new Date('2026-01-28T11:45:30'),
         metadata: { type: 'general' }
       },
       {
         id: 'msg-3-3',
-        content: "We're having trouble with student engagement. Our platform works but students aren't as engaged as we'd like. We're a small team though, just 30 people, so we need something that doesn't require a huge implementation.",
+        content: "HIPAA compliance and data residency are non-negotiable. We've been burned by tools that don't integrate with Epic, and cost is a concern. Our care coordinators are overwhelmed with manual follow-ups.",
         role: 'user',
         timestamp: new Date('2026-01-28T11:46:15'),
         metadata: { type: 'qualification' }
       },
       {
         id: 'msg-3-4',
-        content: "Student engagement is crucial for educational platforms. With a team of 30, you definitely need solutions that are easy to implement and maintain. What's your current timeline for addressing the engagement issues?",
+        content: "Totally fair. We support HIPAA-grade controls, offer US-only data residency, and have Epic integration partners. If we can prove security and ROI, who else needs to be involved?",
         role: 'assistant',
         timestamp: new Date('2026-01-28T11:46:45'),
         metadata: { type: 'qualification' }
       },
       {
         id: 'msg-3-5',
-        content: "We don't have a set timeline yet. We're just starting to look around and see what options are available. Budget is tight for us as a smaller company.",
+        content: "Final decision sits with me and our compliance team, but we wouldn't deploy until next year because of the security review.",
         role: 'user',
         timestamp: new Date('2026-01-28T11:47:20'),
         metadata: { type: 'qualification' }
+      },
+      {
+        id: 'msg-3-6',
+        content: "Understood. I can share our HIPAA compliance package, Epic integration references, and a pilot plan. Would a security review call be the next best step?",
+        role: 'assistant',
+        timestamp: new Date('2026-01-28T11:47:50'),
+        metadata: { type: 'general' }
       }
     ],
     prospect: {
       id: 'demo-prospect-3',
-      name: 'Anonymous User',
-      company: 'EduTech Innovations',
-      companySize: '25-50 employees',
-      industry: 'Education Technology', 
-      painPoints: ['Student engagement issues'],
-      budget: 'Tight budget constraints',
-      timeline: 'No set timeline'
+      name: 'Priya Nair',
+      email: 'priya.nair@healthfirst.com',
+      company: 'HealthFirst Medical',
+      companySize: '100-250 employees',
+      industry: 'Healthcare', 
+      title: 'CTO',
+      painPoints: ['Manual patient follow-ups', 'Compliance risk', 'Integration complexity'],
+      budget: 'Cost concerns',
+      timeline: 'Security review through next year',
+      decisionMaker: true
     },
     qualificationStatus: {
       schemaId: 'bant-default',
@@ -353,17 +363,17 @@ export const DEMO_CONVERSATIONS: StoredConversation[] = [
           description: 'Has budget allocated or authority to allocate budget',
           weight: 0.25,
           status: 'unqualified',
-          confidence: 0.8,
-          evidence: ['Budget is tight for us as a smaller company']
+          confidence: 0.7,
+          evidence: ['cost is a concern']
         },
         authority: {
           id: 'authority',
           name: 'Authority',
           description: 'Has decision-making power or influences the decision',
           weight: 0.25,
-          status: 'unknown',
-          confidence: 0.2,
-          evidence: []
+          status: 'qualified',
+          confidence: 0.85,
+          evidence: ['Final decision sits with me']
         },
         need: {
           id: 'need', 
@@ -371,8 +381,8 @@ export const DEMO_CONVERSATIONS: StoredConversation[] = [
           description: 'Has a clear business need or pain point',
           weight: 0.3,
           status: 'qualified',
-          confidence: 0.7,
-          evidence: ['having trouble with student engagement']
+          confidence: 0.8,
+          evidence: ['care coordinators are overwhelmed with manual follow-ups']
         },
         timeline: {
           id: 'timeline',
@@ -380,19 +390,19 @@ export const DEMO_CONVERSATIONS: StoredConversation[] = [
           description: 'Has a defined timeframe for implementation', 
           weight: 0.2,
           status: 'unqualified',
-          confidence: 0.9,
-          evidence: ['don\'t have a set timeline yet', 'just starting to look around']
+          confidence: 0.85,
+          evidence: ['wouldn\'t deploy until next year']
         }
       },
-      score: 35,
+      score: 55,
       readyToConnect: false,
-      lastUpdated: new Date('2026-01-28T11:47:20')
+      lastUpdated: new Date('2026-01-28T11:47:50')
     },
     tags: [DEFAULT_LEAD_TAGS[2]], // Cold Lead
     crmSynced: false,
-    lastActivity: new Date('2026-01-28T11:47:20'),
+    lastActivity: new Date('2026-01-28T11:47:50'),
     createdAt: new Date('2026-01-28T11:45:00'),
-    updatedAt: new Date('2026-01-28T11:47:20')
+    updatedAt: new Date('2026-01-28T11:47:50')
   }
 ];
 
@@ -404,31 +414,31 @@ export const DEMO_SUMMARIES: TranscriptSummary[] = [
     generatedAt: new Date('2026-01-30T10:20:00'),
     keyPoints: [
       'VP of Engineering with decision authority',
-      'TechFlow Solutions - 250 employees, Software Development',
-      'Budget allocated for this year',
-      '6-month implementation timeline',
-      'Evaluating competitors but can move quickly'
+      'TechFlow Solutions - 250-500 employees, Software Development',
+      'Budget allocated for this quarter',
+      'Vendor selection by end of month, live in 6 months',
+      'Wants Jira + GitHub + Jenkins integration'
     ],
     concerns: [],
-    painPoints: ['Manual workflow processes', 'Dev-to-QA handoff inefficiencies', 'Scaling challenges with team growth'],
+    painPoints: ['Manual dev-to-QA handoffs', 'Sprint delays', 'Scaling engineering workflows'],
     qualificationSummary: {
-      score: 92,
+      score: 94,
       criteria: {
-        budget: { status: 'qualified', evidence: ['budget allocated for this year'] },
-        authority: { status: 'qualified', evidence: ['VP of Engineering', 'can make decisions'] },
-        need: { status: 'qualified', evidence: ['manual handoffs', 'old processes don\'t scale'] },
-        timeline: { status: 'qualified', evidence: ['6-month timeline'] }
+        budget: { status: 'qualified', evidence: ['budget allocated for this quarter'] },
+        authority: { status: 'qualified', evidence: ['decision maker for engineering tooling'] },
+        need: { status: 'qualified', evidence: ['manual handoffs', 'slowing every sprint'] },
+        timeline: { status: 'qualified', evidence: ['vendor by end of this month', 'live within 6 months'] }
       },
       readyToConnect: true
     },
     nextSteps: [
-      'Schedule demo with solutions engineer',
-      'Prepare dev workflow integration presentation',
-      'Send ROI case studies for similar companies',
-      'Connect Thursday afternoon or Friday morning'
+      'Schedule tailored demo with solutions engineer',
+      'Prepare Jira/GitHub/Jenkins integration walkthrough',
+      'Send ROI snapshot for engineering productivity',
+      'Hold live demo Thursday afternoon or Friday morning'
     ],
-    aiConfidence: 0.92,
-    wordCount: 425,
+    aiConfidence: 0.94,
+    wordCount: 452,
     messageCount: 7,
     duration: 4
   },
@@ -437,32 +447,66 @@ export const DEMO_SUMMARIES: TranscriptSummary[] = [
     sessionId: 'demo-session-002',
     generatedAt: new Date('2026-01-29T14:35:00'),
     keyPoints: [
-      'Director of Operations at GlobalManufacturing Corp',
-      'Global automotive parts manufacturer - 1000+ employees',
-      '12 countries, complex supply chain',
-      'Early research phase, 12-18 month timeline',
-      'Requires procurement committee and CEO approval'
+      'Head of Growth at RetailGenius (e-commerce)',
+      'Manual lead qualification slowing response times',
+      'Curious about AI scoring + Shopify/Stripe integrations',
+      'COO approval required, budget not set yet',
+      'Targeting next-quarter rollout'
     ],
-    concerns: ['Significant investment required', 'Multiple stakeholder approval needed'],
-    painPoints: ['Supply chain visibility across 12 countries', 'Bottleneck detection', 'Global coordination'],
+    concerns: ['Needs ROI proof', 'Wants integration clarity'],
+    painPoints: ['Manual lead qualification', 'Slow response times', 'Conversion rate pressure'],
     qualificationSummary: {
-      score: 67,
+      score: 64,
       criteria: {
-        budget: { status: 'unknown', evidence: [] },
-        authority: { status: 'unqualified', evidence: ['needs procurement committee and CEO approval'] },
-        need: { status: 'qualified', evidence: ['visibility nightmare', 'bottleneck problems'] },
-        timeline: { status: 'qualified', evidence: ['12-18 months'] }
+        budget: { status: 'unknown', evidence: ['No budget set yet'] },
+        authority: { status: 'unqualified', evidence: ['COO will sign off'] },
+        need: { status: 'qualified', evidence: ['qualifying manually today and it\'s a bottleneck'] },
+        timeline: { status: 'qualified', evidence: ['roll this out next quarter'] }
       },
       readyToConnect: false
     },
     nextSteps: [
-      'Send automotive manufacturer case studies',
-      'Provide ROI data for procurement committee',
-      'Create executive summary for CEO presentation',
-      'Follow up in 2-3 weeks for research updates'
+      'Share e-commerce case studies',
+      'Provide ROI model for COO review',
+      'Offer discovery call to map onboarding plan',
+      'Follow up with integration checklist'
     ],
-    aiConfidence: 0.78,
-    wordCount: 312,
+    aiConfidence: 0.81,
+    wordCount: 328,
+    messageCount: 6,
+    duration: 3
+  },
+  {
+    id: 'demo-summary-3',
+    sessionId: 'demo-session-003',
+    generatedAt: new Date('2026-01-28T11:50:00'),
+    keyPoints: [
+      'CTO at HealthFirst Medical (healthcare)',
+      'Skeptical about AI for patient inquiries',
+      'HIPAA compliance + US data residency required',
+      'Epic integration and cost are top objections',
+      'Security review pushes deployment to next year'
+    ],
+    concerns: ['HIPAA compliance risk', 'Epic integration gaps', 'Cost sensitivity', 'Long security review'],
+    painPoints: ['Manual patient follow-ups', 'Compliance risk', 'Integration complexity'],
+    qualificationSummary: {
+      score: 55,
+      criteria: {
+        budget: { status: 'unqualified', evidence: ['cost is a concern'] },
+        authority: { status: 'qualified', evidence: ['Final decision sits with me'] },
+        need: { status: 'qualified', evidence: ['care coordinators are overwhelmed'] },
+        timeline: { status: 'unqualified', evidence: ['wouldn\'t deploy until next year'] }
+      },
+      readyToConnect: false
+    },
+    nextSteps: [
+      'Send HIPAA compliance package + security documentation',
+      'Provide Epic integration references',
+      'Offer security review call with compliance team',
+      'Propose low-risk pilot plan'
+    ],
+    aiConfidence: 0.76,
+    wordCount: 301,
     messageCount: 6,
     duration: 3
   }
@@ -549,49 +593,52 @@ export const DEMO_ONBOARDING_CHECKLIST = [
 // Demo script for webinar presentation
 export const WEBINAR_DEMO_SCRIPT = {
   intro: {
-    title: "SalesFusion Sales Room - Live Demo",
-    duration: "2 minutes",
+    title: 'SalesFusion Sales Room - Live Demo',
+    duration: '2 minutes',
     keyPoints: [
-      "AI-powered sales conversations that qualify leads automatically",
-      "Real-time handoff to human sales reps when prospects are ready",
-      "Complete conversation intelligence with CRM integration"
+      'AI-powered sales conversations that qualify leads automatically',
+      'Real-time handoff to human sales reps when prospects are ready',
+      'Full conversation intelligence with CRM-ready summaries'
     ]
   },
   scenario1: {
-    title: "Hot Lead - TechFlow Solutions",
-    duration: "3 minutes", 
-    persona: "Sarah Chen - VP Engineering, needs workflow automation",
+    title: 'Hot Lead - TechFlow Solutions',
+    duration: '3 minutes', 
+    persona: 'Sarah Chen - VP Engineering, ready to buy',
     highlights: [
-      "Watch AI qualify budget, authority, need, timeline in real conversation",
-      "92% qualification score triggers automatic handoff",
-      "Sales rep gets full context before the call"
+      'AI qualifies budget, authority, need, and timeline in real time',
+      '94% qualification score triggers the Talk to Sales handoff',
+      'Sales rep sees full context before the call'
     ]
   },
   scenario2: {
-    title: "Transcript Review & CRM Sync",
-    duration: "2 minutes",
+    title: 'Discovery Call - RetailGenius',
+    duration: '2 minutes',
+    persona: 'Jordan Lee - Head of Growth, curious evaluator',
     highlights: [
-      "Sales rep reviews conversation before calling prospect",
-      "AI summary with key points, concerns, next steps",
-      "One-click sync to Salesforce with all context"
+      'Prospect asks detailed integration questions (Shopify + Stripe)',
+      'AI surfaces missing budget/authority gaps',
+      'Suggested next questions keep discovery moving'
     ]
   },
   scenario3: {
-    title: "Analytics Dashboard",
-    duration: "2 minutes",
+    title: 'Objection Handling - HealthFirst Medical',
+    duration: '2 minutes',
+    persona: 'Priya Nair - CTO, skeptical about compliance + cost',
     highlights: [
-      "247 conversations started this month",
-      "68% qualification rate with AI scoring", 
-      "23 calls booked with full context"
+      'AI captures objections: HIPAA, Epic integration, cost',
+      'Summary highlights security review timeline',
+      'Next steps focus on compliance pack + pilot plan'
     ]
   },
   close: {
-    title: "Results",
-    duration: "1 minute",
+    title: 'Results + Analytics',
+    duration: '1 minute',
     results: [
-      "3x more qualified leads reach your sales team",
-      "Zero context loss - every conversation captured and analyzed",
-      "Sales reps focus on closing, not qualifying"
+      '247 conversations started this month',
+      '68% qualification rate with AI scoring',
+      '23 calls booked with full context',
+      '3x more qualified leads reach your sales team'
     ]
   }
 };
