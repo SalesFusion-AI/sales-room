@@ -1,5 +1,6 @@
 import { transcriptService } from '../services/transcriptService';
 import { handoffService } from '../services/handoffService';
+import { setExpiringSessionItem, getExpiringSessionItem, removeSessionItem, setSessionItem, getSessionItem } from '../utils/sessionStorage';
 import { 
   DEMO_CONVERSATIONS, 
   DEMO_SUMMARIES, 
@@ -58,10 +59,10 @@ export class DemoService {
     console.log(`📝 Loaded ${DEMO_CONVERSATIONS.length} demo conversations`);
   }
 
-  // Load demo summaries
+  // Load demo summaries with expiry (contains PII)
   private loadDemoSummaries(): void {
     DEMO_SUMMARIES.forEach(summary => {
-      localStorage.setItem(`summary-${summary.sessionId}`, JSON.stringify(summary));
+      setExpiringSessionItem(`summary-${summary.sessionId}`, summary);
     });
     console.log(`💡 Loaded ${DEMO_SUMMARIES.length} demo summaries`);
   }
@@ -72,22 +73,22 @@ export class DemoService {
     console.log(`👥 Configured ${DEMO_SALES_REPS.length} demo sales reps`);
   }
 
-  // Set demo analytics in localStorage
+  // Set demo analytics in sessionStorage (non-PII can use regular sessionStorage)
   private setDemoAnalytics(): void {
-    localStorage.setItem('demo_analytics', JSON.stringify(DEMO_ANALYTICS));
-    localStorage.setItem('demo_onboarding', JSON.stringify(DEMO_ONBOARDING_CHECKLIST));
+    setSessionItem('demo_analytics', JSON.stringify(DEMO_ANALYTICS));
+    setSessionItem('demo_onboarding', JSON.stringify(DEMO_ONBOARDING_CHECKLIST));
     console.log('📊 Demo analytics configured');
   }
 
   // Clear existing demo data
   private clearDemoData(): void {
-    // Clear transcripts
-    localStorage.removeItem('salesfusion_transcripts');
-    localStorage.removeItem('salesfusion_summaries');
+    // Clear transcripts and summaries from sessionStorage
+    removeSessionItem('salesfusion_transcripts');
+    removeSessionItem('salesfusion_summaries');
     
-    // Clear demo-specific data
-    localStorage.removeItem('demo_analytics');
-    localStorage.removeItem('demo_onboarding');
+    // Clear demo-specific data from sessionStorage
+    removeSessionItem('demo_analytics');
+    removeSessionItem('demo_onboarding');
     
     console.log('🧹 Cleared existing demo data');
   }
@@ -220,7 +221,7 @@ Step ${this.currentDemoStep + 1} of ${steps.length}
 
   // Get demo analytics
   getDemoAnalytics() {
-    const stored = localStorage.getItem('demo_analytics');
+    const stored = getSessionItem('demo_analytics');
     return stored ? JSON.parse(stored) : DEMO_ANALYTICS;
   }
 

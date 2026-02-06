@@ -4,6 +4,13 @@ import type {
   ProspectInfo, 
   QualificationStatus 
 } from '../types';
+import {
+  DEFAULT_PII_TTL_MS,
+  getExpiringSessionItem,
+  isSessionStorageAvailable,
+  setExpiringSessionItem,
+  removeSessionItem,
+} from '../utils/sessionStorage';
 
 export interface TranscriptSummary {
   id: string;
@@ -98,67 +105,22 @@ export const DEFAULT_LEAD_TAGS: LeadTag[] = [
 export class TranscriptService {
   private storageKey = 'salesfusion_transcripts';
   private summaryKey = 'salesfusion_summaries';
-  private isLocalStorageAvailable = true;
+  private isSessionStorageAvailable = true;
   private inMemoryTranscripts: StoredConversation[] = [];
   private inMemorySummaries: TranscriptSummary[] = [];
+  private retentionMs = DEFAULT_PII_TTL_MS;
   
   constructor() {
-    // Check if localStorage is available
-    this.checkLocalStorageAvailability();
+    // Check if sessionStorage is available
+    this.isSessionStorageAvailable = isSessionStorageAvailable();
+    this.cleanupExpiredStorage();
   }
 
-  // Check if localStorage is available and working
-  private checkLocalStorageAvailability(): void {
-    try {
-      const testKey = '__localStorage_test__';
-      localStorage.setItem(testKey, 'test');
-      localStorage.removeItem(testKey);
-      this.isLocalStorageAvailable = true;
-    } catch (error) {
-      console.warn('localStorage is not available, falling back to in-memory storage:', error);
-      this.isLocalStorageAvailable = false;
-    }
-  }
-
-  // Safe localStorage getItem with fallback
-  private safeGetItem(key: string): string | null {
-    if (!this.isLocalStorageAvailable) {
-      return null;
-    }
-    
-    try {
-      return localStorage.getItem(key);
-    } catch (error) {
-      console.error(`Failed to get item from localStorage (key: ${key}):`, error);
-      this.isLocalStorageAvailable = false;
-      return null;
-    }
-  }
-
-  // Safe localStorage setItem with fallback
-  private safeSetItem(key: string, value: string): boolean {
-    if (!this.isLocalStorageAvailable) {
-      return false;
-    }
-    
-    try {
-      localStorage.setItem(key, value);
-      return true;
-    } catch (error) {
-      console.error(`Failed to set item in localStorage (key: ${key}):`, error);
-      this.isLocalStorageAvailable = false;
-      return false;
-    }
-  }
-
-  // Safe JSON parse with error handling
-  private safeJsonParse<T>(jsonString: string, fallback: T): T {
-    try {
-      return JSON.parse(jsonString);
-    } catch (error) {
-      console.error('Failed to parse JSON:', error);
-      return fallback;
-    }
+  private cleanupExpiredStorage(): void {
+    if (!this.isSessionStorageAvailable) return;
+    // Trigger expiry checks for known keys
+    getExpiringSessionItem<StoredConversation[]>(this.storageKey);
+    getExpiringSessionItem<TranscriptSummary[]>(this.summaryKey);
   }
   
   // Store conversation transcript
@@ -181,8 +143,10 @@ export class TranscriptService {
       transcripts.push(storedConversation);
     }
 
-    // Try to store in localStorage, fallback to in-memory storage
-    const success = this.safeSetItem(this.storageKey, JSON.stringify(transcripts));
+    // Try to store in sessionStorage with expiry, fallback to in-memory storage
+    const success = this.isSessionStorageAvailable
+      ? setExpiringSessionItem(this.storageKey, transcripts, this.retentionMs)
+      : false;
     if (!success) {
       // Fallback to in-memory storage
       this.inMemoryTranscripts = transcripts;
@@ -195,13 +159,15 @@ export class TranscriptService {
   // Get stored transcripts
   getStoredTranscripts(): StoredConversation[] {
     try {
-      const stored = this.safeGetItem(this.storageKey);
+      const stored = this.isSessionStorageAvailable
+        ? getExpiringSessionItem<StoredConversation[]>(this.storageKey)
+        : null;
       if (!stored) {
-        // Return in-memory storage if localStorage is unavailable
-        return this.isLocalStorageAvailable ? [] : this.inMemoryTranscripts;
+        // Return in-memory storage if sessionStorage is unavailable
+        return this.isSessionStorageAvailable ? [] : this.inMemoryTranscripts;
       }
       
-      const transcripts = this.safeJsonParse(stored, []);
+      const transcripts = stored;
       return transcripts.map((t: any) => ({
         ...t,
         createdAt: new Date(t.createdAt),
@@ -215,7 +181,7 @@ export class TranscriptService {
     } catch (error) {
       console.error('Failed to load stored transcripts:', error);
       // Return in-memory storage as fallback
-      return this.isLocalStorageAvailable ? [] : this.inMemoryTranscripts;
+      return this.isSessionStorageAvailable ? [] : this.inMemoryTranscripts;
     }
   }
 
@@ -281,8 +247,10 @@ export class TranscriptService {
       summaries.push(summary);
     }
     
-    // Try to store in localStorage, fallback to in-memory storage
-    const success = this.safeSetItem(this.summaryKey, JSON.stringify(summaries));
+    // Try to store in sessionStorage with expiry, fallback to in-memory storage
+    const success = this.isSessionStorageAvailable
+      ? setExpiringSessionItem(this.summaryKey, summaries, this.retentionMs)
+      : false;
     if (!success) {
       // Fallback to in-memory storage
       this.inMemorySummaries = summaries;
@@ -293,13 +261,15 @@ export class TranscriptService {
   // Get stored summaries
   private getStoredSummaries(): TranscriptSummary[] {
     try {
-      const stored = this.safeGetItem(this.summaryKey);
+      const stored = this.isSessionStorageAvailable
+        ? getExpiringSessionItem<TranscriptSummary[]>(this.summaryKey)
+        : null;
       if (!stored) {
-        // Return in-memory storage if localStorage is unavailable
-        return this.isLocalStorageAvailable ? [] : this.inMemorySummaries;
+        // Return in-memory storage if sessionStorage is unavailable
+        return this.isSessionStorageAvailable ? [] : this.inMemorySummaries;
       }
       
-      const summaries = this.safeJsonParse(stored, []);
+      const summaries = stored;
       return summaries.map((s: any) => ({
         ...s,
         generatedAt: new Date(s.generatedAt),
@@ -307,7 +277,7 @@ export class TranscriptService {
     } catch (error) {
       console.error('Failed to load stored summaries:', error);
       // Return in-memory storage as fallback
-      return this.isLocalStorageAvailable ? [] : this.inMemorySummaries;
+      return this.isSessionStorageAvailable ? [] : this.inMemorySummaries;
     }
   }
 
