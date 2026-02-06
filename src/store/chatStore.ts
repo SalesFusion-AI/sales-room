@@ -197,6 +197,47 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       error: null,
     });
   },
+
+  loadDemoScenario: () => {
+    // Load the hot lead demo conversation (TechFlow Solutions)
+    const hotLeadMessages = [
+      {
+        id: '1',
+        content: "Hi! I'm here to help you learn about our AI sales platform. What brings you here today?",
+        role: 'assistant' as const,
+        timestamp: new Date(),
+      },
+      {
+        id: 'demo-msg-1',
+        content: "Hi, I'm Sarah Chen, VP of Engineering at TechFlow Solutions. We're evaluating workflow automation for our dev-to-QA handoffs and your platform looks promising.",
+        role: 'user' as const,
+        timestamp: new Date(),
+      }
+    ];
+
+    // Initialize demo environment
+    demoService.initializeDemoEnvironment().catch(console.error);
+
+    set({
+      messages: hotLeadMessages,
+      sessionId: 'demo-session-001',
+      prospectInfo: {
+        name: 'Sarah Chen',
+        company: 'TechFlow Solutions',
+        email: 'sarah.chen@techflow.com',
+      },
+      isQualified: false,
+      qualificationScore: 15, // Start with some score from the initial message
+      demoQualificationSignals: {
+        budget: false,
+        timeline: false,
+        painPoint: false,
+        nameCompany: true, // Already mentioned name and company
+        demoPricing: false,
+      },
+      error: null,
+    });
+  },
 }));
 
 // Helper to extract prospect info from messages
