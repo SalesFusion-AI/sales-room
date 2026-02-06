@@ -4,6 +4,7 @@ import { useChatStore, useMessages, useIsTyping, useProspectInfo, useError } fro
 import TalkToSalesButton from './components/TalkToSales/TalkToSalesButton';
 import SettingsButton from './components/Settings/SettingsButton';
 import SettingsPanel from './components/Settings/SettingsPanel';
+import './App.css';
 
 function App() {
   const sendUserMessage = useChatStore(s => s.sendUserMessage);
@@ -43,18 +44,18 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen h-[100svh] bg-black flex flex-col overflow-hidden">
+    <div className="min-h-screen h-[100svh] bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="flex-shrink-0 bg-gray-900 border-b border-gray-800">
+      <header className="flex-shrink-0 bg-[rgba(28,28,30,0.75)] backdrop-blur-[20px] border-b border-[var(--border)]">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center space-x-3 sm:space-x-4">
-              <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-br from-[#007AFF] to-[#0A84FF] rounded-2xl flex items-center justify-center shadow-lg">
                 <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
               </div>
               <div className="min-w-0">
-                <h1 className="text-lg sm:text-xl font-semibold text-white truncate">SalesFusion AI</h1>
-                <p className="text-xs sm:text-sm text-gray-400">Your Sales Automation Assistant</p>
+                <h1 className="text-lg sm:text-xl font-semibold text-white truncate app-heading">SalesFusion AI</h1>
+                <p className="text-xs sm:text-sm text-[var(--text-secondary)]">Your Sales Automation Assistant</p>
               </div>
             </div>
             
@@ -62,7 +63,7 @@ function App() {
               {/* Prospect info indicator */}
               {prospectInfo.name && (
                 <div className="flex items-center text-xs sm:text-sm">
-                  <div className="flex items-center text-gray-300 bg-gray-800 px-3 py-2 rounded-full">
+                  <div className="flex items-center text-[var(--text-secondary)] bg-white/5 border border-white/10 px-3 py-2 rounded-full backdrop-blur-md">
                     <User className="h-4 w-4 mr-2" />
                     <span className="truncate max-w-[180px] sm:max-w-none">{prospectInfo.name}</span>
                   </div>
@@ -76,7 +77,7 @@ function App() {
 
       {/* Main Chat Container */}
       <div className="flex-1 flex flex-col min-h-0 max-w-4xl mx-auto w-full">
-        <div className="flex-1 flex flex-col bg-gray-950 mx-3 sm:mx-4 my-3 sm:my-4 rounded-2xl sm:rounded-3xl shadow-2xl border border-gray-800 overflow-hidden">
+        <div className="flex-1 flex flex-col glass-panel mx-3 sm:mx-4 my-3 sm:my-4 rounded-2xl sm:rounded-3xl overflow-hidden">
           
           {/* Error Banner */}
           {error && (
@@ -89,7 +90,7 @@ function App() {
           )}
 
           {/* Messages Area */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 scroll-smooth pb-28 sm:pb-6">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 scroll-smooth pb-28 sm:pb-6 scrollbar-thin">
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -98,13 +99,13 @@ function App() {
                 <div
                   className={`max-w-[85%] sm:max-w-sm md:max-w-md px-4 sm:px-5 py-3.5 sm:py-4 rounded-2xl sm:rounded-3xl shadow-lg ${
                     message.role === 'user'
-                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
-                      : 'bg-gray-800 text-gray-100 border border-gray-700'
+                      ? 'bg-gradient-to-r from-[#007AFF] to-[#0A84FF] text-white'
+                      : 'bg-white/5 text-white border border-white/10 backdrop-blur-[20px]'
                   }`}
                 >
                   <p className="text-sm sm:text-base leading-relaxed whitespace-pre-wrap">{message.content}</p>
                   <p className={`text-xs mt-2 ${
-                    message.role === 'user' ? 'text-blue-100' : 'text-gray-400'
+                    message.role === 'user' ? 'text-blue-100/80' : 'text-[var(--text-secondary)]'
                   }`}>
                     {message.timestamp.toLocaleTimeString()}
                   </p>
@@ -115,11 +116,11 @@ function App() {
             {/* Typing indicator */}
             {isTyping && (
               <div className="flex justify-start">
-                <div className="bg-gray-800 border border-gray-700 rounded-2xl sm:rounded-3xl px-4 sm:px-5 py-3.5 sm:py-4 shadow-lg">
+                <div className="bg-white/5 border border-white/10 rounded-2xl sm:rounded-3xl px-4 sm:px-5 py-3.5 sm:py-4 shadow-lg backdrop-blur-[20px]">
                   <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                    <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                   </div>
                 </div>
               </div>
@@ -128,7 +129,7 @@ function App() {
           </div>
 
           {/* Input Area */}
-          <div className="flex-shrink-0 border-t border-gray-800 bg-gray-900/70 backdrop-blur-sm p-4 sm:p-6 sticky bottom-0 pb-[env(safe-area-inset-bottom)]">
+          <div className="flex-shrink-0 border-t border-[var(--border)] bg-white/5 backdrop-blur-[20px] p-4 sm:p-6 sticky bottom-0 pb-[env(safe-area-inset-bottom)]">
             <div className="flex items-center space-x-3 sm:space-x-4">
               <input
                 type="text"
@@ -137,13 +138,13 @@ function App() {
                 onKeyDown={handleKeyDown}
                 maxLength={500}
                 placeholder="Type your message..."
-                className="flex-1 min-h-[44px] bg-gray-800 border border-gray-700 rounded-2xl px-4 py-3 text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
+                className="flex-1 min-h-[44px] glass-input px-4 py-3 placeholder:text-[var(--text-secondary)]"
                 disabled={isTyping}
               />
               <button
                 onClick={handleSendMessage}
                 disabled={!inputMessage.trim() || isTyping}
-                className="min-h-[44px] min-w-[44px] bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 sm:px-6 py-3 rounded-2xl transition-all duration-200 flex items-center justify-center shadow-lg hover:shadow-xl"
+                className="min-h-[44px] min-w-[44px] bg-gradient-to-r from-[#007AFF] to-[#0A84FF] hover:from-[#0A84FF] hover:to-[#5AC8FA] disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 sm:px-6 py-3 rounded-2xl transition-all duration-200 flex items-center justify-center shadow-lg hover:shadow-xl"
                 aria-label="Send message"
               >
                 <Send className="h-4 w-4" />
@@ -163,7 +164,7 @@ function App() {
                   key={prompt}
                   onClick={() => handlePromptClick(prompt)}
                   disabled={isTyping}
-                  className="min-h-[44px] text-xs sm:text-sm bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-300 hover:text-white px-3 sm:px-4 py-2.5 rounded-2xl border border-gray-700 hover:border-gray-600 transition-all duration-200"
+                  className="min-h-[44px] text-xs sm:text-sm bg-white/5 hover:bg-white/10 disabled:opacity-50 text-[var(--text-secondary)] hover:text-white px-3 sm:px-4 py-2.5 rounded-2xl border border-white/10 hover:border-white/20 transition-all duration-200 backdrop-blur-[20px]"
                 >
                   {prompt}
                 </button>
