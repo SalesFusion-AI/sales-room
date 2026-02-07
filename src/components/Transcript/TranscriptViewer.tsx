@@ -53,7 +53,7 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
         setConversation(storedConversation);
         
         // Load or generate summary
-        let existingSummary = transcriptService.getSummary(sessionId);
+        const existingSummary = transcriptService.getSummary(sessionId);
         if (!existingSummary) {
           setLoading(true);
           transcriptService.generateSummary(storedConversation).then(newSummary => {

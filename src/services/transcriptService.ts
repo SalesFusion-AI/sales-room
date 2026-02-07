@@ -1,7 +1,5 @@
 import type { 
   Conversation, 
-  Message, 
-  ProspectInfo, 
   QualificationStatus 
 } from '../types';
 import {
@@ -9,7 +7,6 @@ import {
   getExpiringSessionItem,
   isSessionStorageAvailable,
   setExpiringSessionItem,
-  removeSessionItem,
 } from '../utils/sessionStorage';
 
 export interface TranscriptSummary {

@@ -271,8 +271,6 @@ function extractProspectInfo(
   message: string,
   set: (fn: (s: ChatStore) => Partial<ChatStore>) => void
 ) {
-  const lowerMessage = message.toLowerCase();
-  
   // Extract name
   const nameMatch = message.match(/(?:i'm |my name is |i am )([A-Z][a-z]+ ?[A-Z]?[a-z]*)/i);
   if (nameMatch) {
