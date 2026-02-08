@@ -44,7 +44,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen h-[100svh] bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden">
+    <div className="min-h-screen h-[100svh] text-[var(--text-primary)] flex flex-col overflow-hidden relative z-10">
       {/* Header */}
       <header className="flex-shrink-0 bg-[rgba(28,28,30,0.75)] backdrop-blur-[20px] border-b border-[var(--border)]">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
@@ -99,8 +99,8 @@ function App() {
                 <div
                   className={`max-w-[85%] sm:max-w-sm md:max-w-md px-4 sm:px-5 py-3.5 sm:py-4 rounded-2xl sm:rounded-3xl shadow-lg ${
                     message.role === 'user'
-                      ? 'bg-gradient-to-r from-[#007AFF] to-[#0A84FF] text-white'
-                      : 'bg-white/5 text-white border border-white/10 backdrop-blur-[20px]'
+                      ? 'bg-gradient-to-br from-[#007AFF] via-[#0A84FF] to-[#5AC8FA] text-white shadow-[0_8px_32px_rgba(0,122,255,0.3)]'
+                      : 'bg-gradient-to-br from-white/[0.12] to-white/[0.04] text-white border border-white/20 backdrop-blur-[40px] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)]'
                   }`}
                 >
                   <p className="text-sm sm:text-base leading-relaxed whitespace-pre-wrap">{message.content}</p>
@@ -178,6 +178,9 @@ function App() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
       />
+      
+      {/* Talk to Sales floating button - appears when qualification score > 75 */}
+      <TalkToSalesButton />
     </div>
   );
 }
