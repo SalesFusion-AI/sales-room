@@ -170,7 +170,7 @@ export function validateName(
   }
 
   // Check for valid name characters (letters, spaces, hyphens, apostrophes)
-  const namePattern = /^[a-zA-Z\s\-'\.]+$/;
+  const namePattern = /^[a-zA-Z\s\-'.]+$/;
   if (!namePattern.test(trimmedName)) {
     return {
       isValid: false,
@@ -247,7 +247,7 @@ function isExcessivelyFormatted(text: string): boolean {
   }
 
   // Check for excessive special characters
-  const specialCharCount = (text.match(/[!@#$%^&*()_+={}\[\]:";'<>?,./~`]/g) || []).length;
+  const specialCharCount = (text.match(/[!@#$%^&*()_+={}[\]:";'<>?,./~`]/g) || []).length;
   if (specialCharCount > text.length * 0.3) {
     return true;
   }

@@ -75,7 +75,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       // Validate and sanitize input
       const validation = validateMessage(content, { maxLength: 500, minLength: 1 });
       if (!validation.isValid) {
-        set(s => ({
+        set(() => ({
           error: validation.error || 'Invalid message',
         }));
         return;
@@ -213,7 +213,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       console.error('Failed to send message:', error);
       
       // Ensure we always clear the typing state and set error
-      set(s => ({
+      set(() => ({
         isTyping: false,
         error: error instanceof Error ? error.message : 'Failed to send message',
       }));

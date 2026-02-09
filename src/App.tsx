@@ -24,13 +24,46 @@ function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
+  // Validate input as user types
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInputMessage(value);
+    
+    // Clear previous error
+    if (inputError) {
+      setInputError(null);
+    }
+    
+    // Validate if there's content
+    if (value.trim()) {
+      const validation = validateMessage(value, { maxLength: 500, minLength: 1 });
+      if (!validation.isValid) {
+        setInputError(validation.error || null);
+      }
+    }
+  }, [inputError]);
+
   // Memoize handlers to prevent unnecessary re-renders of child components
   const handleSendMessage = useCallback(async () => {
     const trimmedMessage = inputMessage.trim();
-    if (trimmedMessage && !isTyping) {
-      setInputMessage('');
-      await sendUserMessage(trimmedMessage);
+    
+    if (!trimmedMessage) {
+      setInputError('Message cannot be empty');
+      return;
     }
+    
+    if (isTyping) return;
+    
+    // Final validation before sending
+    const validation = validateMessage(trimmedMessage, { maxLength: 500, minLength: 1 });
+    if (!validation.isValid) {
+      setInputError(validation.error || 'Invalid message');
+      return;
+    }
+    
+    setInputMessage('');
+    setInputError(null);
+    await sendUserMessage(trimmedMessage);
   }, [inputMessage, isTyping, sendUserMessage]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -43,6 +76,7 @@ function App() {
   const handlePromptClick = useCallback((prompt: string) => {
     if (!isTyping) {
       setInputMessage('');
+      setInputError(null);
       sendUserMessage(prompt);
     }
   }, [isTyping, sendUserMessage]);
@@ -144,19 +178,28 @@ function App() {
           {/* Input Area */}
           <div className="flex-shrink-0 border-t border-[var(--border)] bg-white/5 backdrop-blur-[20px] p-4 sm:p-6 sticky bottom-0 pb-[env(safe-area-inset-bottom)]">
             <div className="flex items-center space-x-3 sm:space-x-4">
-              <input
-                type="text"
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyDown={handleKeyDown}
-                maxLength={500}
-                placeholder="Type your message..."
-                className="flex-1 min-h-[44px] glass-input px-4 py-3 placeholder:text-[var(--text-secondary)]"
-                disabled={isTyping}
-              />
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={inputMessage}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  maxLength={500}
+                  placeholder="Type your message..."
+                  className={`w-full min-h-[44px] glass-input px-4 py-3 placeholder:text-[var(--text-secondary)] ${
+                    inputError ? 'border-red-500 focus:border-red-500' : ''
+                  }`}
+                  disabled={isTyping}
+                />
+                {inputError && (
+                  <p className="text-red-400 text-xs mt-1 px-2">
+                    {inputError}
+                  </p>
+                )}
+              </div>
               <button
                 onClick={handleSendMessage}
-                disabled={!inputMessage.trim() || isTyping}
+                disabled={!inputMessage.trim() || isTyping || !!inputError}
                 className="min-h-[44px] min-w-[44px] bg-gradient-to-r from-[#007AFF] to-[#0A84FF] hover:from-[#0A84FF] hover:to-[#5AC8FA] disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 sm:px-6 py-3 rounded-2xl transition-all duration-200 flex items-center justify-center shadow-lg hover:shadow-xl"
                 aria-label="Send message"
               >
