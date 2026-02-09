@@ -1,18 +1,21 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Send, MessageSquare, User, AlertCircle } from 'lucide-react';
 import { useChatStore, useMessages, useIsTyping, useProspectInfo, useError } from './store/chatStore';
+import { validateMessage } from './utils/validation';
 import TalkToSalesButton from './components/TalkToSales/TalkToSalesButton';
 import SettingsButton from './components/Settings/SettingsButton';
 import SettingsPanel from './components/Settings/SettingsPanel';
 import './App.css';
 
 function App() {
-  const sendUserMessage = useChatStore(s => s.sendUserMessage);
+  // Use optimized selectors to prevent unnecessary re-renders
+  const sendUserMessage = useChatStore(useCallback(s => s.sendUserMessage, []));
   const messages = useMessages();
   const isTyping = useIsTyping();
   const prospectInfo = useProspectInfo();
   const error = useError();
   const [inputMessage, setInputMessage] = useState('');
+  const [inputError, setInputError] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -21,27 +24,37 @@ function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  const handleSendMessage = async () => {
-    if (inputMessage.trim() && !isTyping) {
-      const message = inputMessage;
+  // Memoize handlers to prevent unnecessary re-renders of child components
+  const handleSendMessage = useCallback(async () => {
+    const trimmedMessage = inputMessage.trim();
+    if (trimmedMessage && !isTyping) {
       setInputMessage('');
-      await sendUserMessage(message);
+      await sendUserMessage(trimmedMessage);
     }
-  };
+  }, [inputMessage, isTyping, sendUserMessage]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
-  };
+  }, [handleSendMessage]);
 
-  const handlePromptClick = (prompt: string) => {
+  const handlePromptClick = useCallback((prompt: string) => {
     if (!isTyping) {
       setInputMessage('');
       sendUserMessage(prompt);
     }
-  };
+  }, [isTyping, sendUserMessage]);
+
+  // Memoize suggested prompts to prevent recreation on every render
+  const suggestedPrompts = useMemo(() => [
+    "What does SalesFusion do?",
+    "How does the AI work?",
+    "Tell me about pricing",
+    "I want to automate my sales",
+    "Book a demo"
+  ], []);
 
   return (
     <div className="min-h-screen h-[100svh] text-[var(--text-primary)] flex flex-col overflow-hidden relative z-10">
@@ -153,13 +166,7 @@ function App() {
 
             {/* Suggested Prompts */}
             <div className="mt-4 flex flex-wrap gap-2">
-              {[
-                "What does SalesFusion do?",
-                "How does the AI work?",
-                "Tell me about pricing",
-                "I want to automate my sales",
-                "Book a demo"
-              ].map((prompt) => (
+              {suggestedPrompts.map((prompt) => (
                 <button
                   key={prompt}
                   onClick={() => handlePromptClick(prompt)}

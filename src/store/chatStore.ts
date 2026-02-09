@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { sendMessage } from '../services/chatService';
 import { qualificationService } from '../services/qualificationService';
 import { demoService } from '../demo/demoService';
+import { validateMessage, validateProspectInfo, sanitizeInput } from '../utils/validation';
 import type { QualificationStatus } from '../types';
 
 interface Message {
@@ -70,107 +71,183 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   error: null,
   
   sendUserMessage: async (content: string) => {
-    // Add user message immediately
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content,
-      role: 'user',
-      timestamp: new Date(),
-    };
-    
-    set(s => ({
-      messages: [...s.messages, userMessage],
-      isTyping: true,
-      error: null,
-    }));
-
-    const updateQualificationStatus = async (options?: { messageContent?: string; demoMode?: boolean }) => {
-      const currentState = get();
-      try {
-        const updated = await qualificationService.assessQualificationFromMessages(
-          currentState.messages,
-          currentState.qualificationStatus
-        );
-
-        set(s => {
-          const nextStatus = { ...s.qualificationStatus, ...updated };
-          const baseScore = typeof updated.score === 'number' ? updated.score : nextStatus.score;
-          let nextScore = baseScore;
-          let nextSignals = s.demoQualificationSignals;
-
-          if (options?.demoMode) {
-            const demoUpdate = getDemoQualificationUpdate(options.messageContent ?? '', s.demoQualificationSignals, s.prospectInfo);
-            nextSignals = demoUpdate.signals;
-            if (demoUpdate.increment > 0) {
-              nextScore = Math.min(100, Math.max(baseScore, s.qualificationScore) + demoUpdate.increment);
-            } else {
-              nextScore = Math.max(baseScore, s.qualificationScore);
-            }
-          }
-
-          return {
-            qualificationStatus: nextStatus,
-            qualificationScore: nextScore,
-            isQualified: nextScore >= 75,
-            demoQualificationSignals: nextSignals,
-          };
-        });
-      } catch (qualificationError) {
-        console.warn('Failed to update qualification status:', qualificationError);
-      }
-    };
-
-    await updateQualificationStatus();
-    
     try {
-      const state = get();
+      // Validate and sanitize input
+      const validation = validateMessage(content, { maxLength: 500, minLength: 1 });
+      if (!validation.isValid) {
+        set(s => ({
+          error: validation.error || 'Invalid message',
+        }));
+        return;
+      }
 
-      // Build context from conversation history
-      const previousMessages = state.messages.map(m => ({
+      const sanitizedContent = sanitizeInput(content);
+
+      // Add user message immediately
+      const userMessage: Message = {
+        id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        content: sanitizedContent,
+        role: 'user',
+        timestamp: new Date(),
+      };
+      
+      // Optimistic update - add user message and set typing state
+      set(s => ({
+        messages: [...s.messages, userMessage],
+        isTyping: true,
+        error: null,
+      }));
+
+      // Extract prospect info early from user message
+      extractProspectInfo(sanitizedContent, set);
+
+      const updateQualificationStatus = async (options?: { messageContent?: string; demoMode?: boolean }) => {
+        try {
+          const currentState = get();
+          const updated = await qualificationService.assessQualificationFromMessages(
+            currentState.messages,
+            currentState.qualificationStatus
+          );
+
+          // Use functional update to avoid stale state
+          set(s => {
+            // Ensure we're working with the latest state
+            const nextStatus = { ...s.qualificationStatus, ...updated };
+            const baseScore = typeof updated.score === 'number' ? updated.score : nextStatus.score;
+            let nextScore = baseScore;
+            let nextSignals = { ...s.demoQualificationSignals };
+
+            if (options?.demoMode) {
+              const demoUpdate = getDemoQualificationUpdate(
+                options.messageContent ?? '', 
+                s.demoQualificationSignals, 
+                s.prospectInfo
+              );
+              nextSignals = { ...demoUpdate.signals };
+              if (demoUpdate.increment > 0) {
+                nextScore = Math.min(100, Math.max(baseScore, s.qualificationScore) + demoUpdate.increment);
+              } else {
+                nextScore = Math.max(baseScore, s.qualificationScore);
+              }
+            }
+
+            return {
+              qualificationStatus: nextStatus,
+              qualificationScore: nextScore,
+              isQualified: nextScore >= 75,
+              demoQualificationSignals: nextSignals,
+            };
+          });
+        } catch (qualificationError) {
+          console.warn('Failed to update qualification status:', qualificationError);
+          // Don't throw here - qualification failure shouldn't break chat
+        }
+      };
+
+      // Initial qualification update
+      await updateQualificationStatus();
+      
+      // Get fresh state for API call
+      const currentState = get();
+
+      // Build context from conversation history (limit to last 10 messages to avoid token limits)
+      const recentMessages = currentState.messages.slice(-10).map(m => ({
         role: m.role,
         content: m.content,
       }));
       
-      // Call API
-      const response = await sendMessage(content, state.sessionId, {
-        prospectName: state.prospectInfo.name,
-        company: state.prospectInfo.company,
-        email: state.prospectInfo.email,
-        previousMessages,
-      });
+      // Call API with retry logic
+      let response;
+      let retryCount = 0;
+      const maxRetries = 2;
+
+      while (retryCount <= maxRetries) {
+        try {
+          response = await sendMessage(sanitizedContent, currentState.sessionId, {
+            prospectName: currentState.prospectInfo.name,
+            company: currentState.prospectInfo.company,
+            email: currentState.prospectInfo.email,
+            previousMessages: recentMessages,
+          });
+          break; // Success, exit retry loop
+        } catch (apiError) {
+          retryCount++;
+          if (retryCount > maxRetries) {
+            throw apiError; // Final failure after retries
+          }
+          
+          // Wait before retry (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
+        }
+      }
+
+      if (!response) {
+        throw new Error('Failed to get response after retries');
+      }
       
-      // Add AI response
+      // Add AI response with updated state
       const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: `assistant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         content: response.response,
         role: 'assistant',
         timestamp: new Date(),
       };
       
+      // Atomic state update
       set(s => ({
         messages: [...s.messages, aiMessage],
         isTyping: false,
         sessionId: response.sessionId,
+        error: null, // Clear any previous errors
       }));
 
-      const demoMode = demoService.isDemoActive() || isDemoSessionId(response.sessionId) || isDemoSessionId(state.sessionId);
-      await updateQualificationStatus({ messageContent: content, demoMode });
+      // Post-response qualification update
+      const finalState = get();
+      const demoMode = demoService.isDemoActive() || 
+                      isDemoSessionId(response.sessionId) || 
+                      isDemoSessionId(finalState.sessionId);
       
-      // Extract prospect info from conversation if mentioned
-      extractProspectInfo(content, set);
+      await updateQualificationStatus({ messageContent: sanitizedContent, demoMode });
       
     } catch (error) {
       console.error('Failed to send message:', error);
-      set({
+      
+      // Ensure we always clear the typing state and set error
+      set(s => ({
         isTyping: false,
         error: error instanceof Error ? error.message : 'Failed to send message',
-      });
+      }));
+      
+      // Don't rethrow - let the UI handle the error state
     }
   },
   
   setProspectInfo: (info: Partial<ProspectInfo>) => {
+    // Validate prospect information before setting
+    const validation = validateProspectInfo(info);
+    
+    if (!validation.isValid) {
+      // Log validation errors but don't prevent setting (for flexibility)
+      console.warn('Prospect info validation warnings:', validation.errors);
+    }
+
+    // Sanitize the input data
+    const sanitizedInfo: Partial<ProspectInfo> = {};
+    
+    if (info.name !== undefined) {
+      sanitizedInfo.name = sanitizeInput(info.name).substring(0, 50); // Limit length
+    }
+    
+    if (info.email !== undefined) {
+      sanitizedInfo.email = sanitizeInput(info.email).toLowerCase().substring(0, 254);
+    }
+    
+    if (info.company !== undefined) {
+      sanitizedInfo.company = sanitizeInput(info.company).substring(0, 100);
+    }
+
     set(s => ({
-      prospectInfo: { ...s.prospectInfo, ...info },
+      prospectInfo: { ...s.prospectInfo, ...sanitizedInfo },
     }));
   },
   
