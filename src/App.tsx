@@ -5,6 +5,11 @@ import { validateMessage } from './utils/validation';
 import TalkToSalesButton from './components/TalkToSales/TalkToSalesButton';
 import SettingsButton from './components/Settings/SettingsButton';
 import SettingsPanel from './components/Settings/SettingsPanel';
+import QualificationProgress from './components/Progress/QualificationProgress';
+import ConfettiCelebration from './components/Celebration/ConfettiCelebration';
+import LoadDemoButton from './components/Demo/LoadDemoButton';
+import MessageBubble from './components/Chat/MessageBubble';
+import TypingIndicator from './components/Chat/TypingIndicator';
 import './App.css';
 
 function App() {
@@ -122,6 +127,12 @@ function App() {
         </div>
       </header>
 
+      {/* Progress Indicator */}
+      <QualificationProgress />
+      
+      {/* Load Demo Button */}
+      <LoadDemoButton />
+
       {/* Main Chat Container */}
       <div className="flex-1 flex flex-col min-h-0 max-w-4xl mx-auto w-full">
         <div className="flex-1 flex flex-col glass-panel mx-3 sm:mx-4 my-3 sm:my-4 rounded-2xl sm:rounded-3xl overflow-hidden">
@@ -138,40 +149,16 @@ function App() {
 
           {/* Messages Area */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 scroll-smooth pb-28 sm:pb-6 scrollbar-thin">
-            {messages.map((message) => (
-              <div
+            {messages.map((message, index) => (
+              <MessageBubble 
                 key={message.id}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[85%] sm:max-w-sm md:max-w-md px-4 sm:px-5 py-3.5 sm:py-4 rounded-2xl sm:rounded-3xl shadow-lg ${
-                    message.role === 'user'
-                      ? 'bg-gradient-to-br from-[#007AFF] via-[#0A84FF] to-[#5AC8FA] text-white shadow-[0_8px_32px_rgba(0,122,255,0.3)]'
-                      : 'bg-gradient-to-br from-white/[0.12] to-white/[0.04] text-white border border-white/20 backdrop-blur-[40px] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)]'
-                  }`}
-                >
-                  <p className="text-sm sm:text-base leading-relaxed whitespace-pre-wrap">{message.content}</p>
-                  <p className={`text-xs mt-2 ${
-                    message.role === 'user' ? 'text-blue-100/80' : 'text-[var(--text-secondary)]'
-                  }`}>
-                    {message.timestamp.toLocaleTimeString()}
-                  </p>
-                </div>
-              </div>
+                message={message}
+                isLatest={index === messages.length - 1}
+              />
             ))}
 
             {/* Typing indicator */}
-            {isTyping && (
-              <div className="flex justify-start">
-                <div className="bg-white/5 border border-white/10 rounded-2xl sm:rounded-3xl px-4 sm:px-5 py-3.5 sm:py-4 shadow-lg backdrop-blur-[20px]">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                  </div>
-                </div>
-              </div>
-            )}
+            {isTyping && <TypingIndicator />}
             <div ref={messagesEndRef} />
           </div>
 
@@ -228,6 +215,9 @@ function App() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
       />
+      
+      {/* Confetti celebration */}
+      <ConfettiCelebration />
       
       {/* Talk to Sales floating button - appears when qualification score > 75 */}
       <TalkToSalesButton />

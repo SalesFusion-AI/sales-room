@@ -49,6 +49,18 @@
       radial-gradient(circle 300px at 80% 70%, rgba(0, 200, 255, 0.12), transparent 50%);
     pointer-events: none;
     z-index: 0;
+    animation: subtle-shift 20s ease-in-out infinite alternate;
+  }
+  
+  @keyframes subtle-shift {
+    from {
+      transform: translateY(0px);
+      filter: hue-rotate(0deg);
+    }
+    to {
+      transform: translateY(-10px);
+      filter: hue-rotate(10deg);
+    }
   }
 }
 
@@ -104,5 +116,61 @@
   
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.35);
+  }
+
+  /* Smooth scroll behavior */
+  .scroll-smooth {
+    scroll-behavior: smooth;
+  }
+  
+  /* Animation classes */
+  @keyframes animate-in {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes slide-in-from-bottom-2 {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes slide-in-from-bottom-4 {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .animate-in {
+    animation: animate-in 0.5s ease-out;
+  }
+  
+  .slide-in-from-bottom-2 {
+    animation: slide-in-from-bottom-2 0.3s ease-out;
+  }
+  
+  .slide-in-from-bottom-4 {
+    animation: slide-in-from-bottom-4 0.5s ease-out;
+  }
+
+  /* Enhanced shadow utilities */
+  .shadow-3xl {
+    box-shadow: 0 35px 60px -12px rgba(0, 0, 0, 0.5);
   }
 }
