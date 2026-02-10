@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { sendMessage } from '../services/chatService';
 import { qualificationService } from '../services/qualificationService';
 import { demoService } from '../demo/demoService';
+import { crmHooksService } from '../services/crmHooks';
 import { validateMessage, validateProspectInfo, sanitizeInput } from '../utils/validation';
 import type { QualificationStatus } from '../types';
 
@@ -104,6 +105,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       const updateQualificationStatus = async (options?: { messageContent?: string; demoMode?: boolean }) => {
         try {
           const currentState = get();
+          const previousScore = currentState.qualificationScore;
+          
           const updated = await qualificationService.assessQualificationFromMessages(
             currentState.messages,
             currentState.qualificationStatus
@@ -130,6 +133,23 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                 nextScore = Math.max(baseScore, s.qualificationScore);
               }
             }
+
+            // Trigger CRM hooks for qualification updates (in background)
+            const conversation = {
+              id: s.sessionId || `temp_${Date.now()}`,
+              sessionId: s.sessionId || 'unknown',
+              prospect: s.prospectInfo,
+              messages: s.messages,
+              qualificationStatus: nextStatus,
+              createdAt: new Date(),
+              lastActivity: new Date(),
+              updatedAt: new Date(),
+              tags: [],
+              crmSynced: false
+            };
+            
+            // Fire and forget - don't block UI
+            crmHooksService.handleQualificationUpdate(conversation, previousScore).catch(console.error);
 
             return {
               qualificationStatus: nextStatus,

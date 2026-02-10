@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { MessageSquareText } from 'lucide-react';
 import { useQualificationScore } from '../../store/chatStore';
+import { getQualificationConfig } from '../../../qualification.config';
 import HandoffModal from './HandoffModal';
 
 export default function TalkToSalesButton() {
   const qualificationScore = useQualificationScore();
   const [isOpen, setIsOpen] = useState(false);
+  const config = getQualificationConfig();
 
-  if (qualificationScore <= 75) return null;
+  if (qualificationScore <= config.thresholds.showTalkToSales) return null;
 
   return (
     <>
@@ -20,7 +22,7 @@ export default function TalkToSalesButton() {
         </span>
         <span className="flex flex-col text-left leading-tight">
           <span>Talk to Sales</span>
-          <span className="text-xs text-gray-400">{qualificationScore}% qualified</span>
+          <span className="text-xs text-gray-400">Ready to connect</span>
         </span>
       </button>
 

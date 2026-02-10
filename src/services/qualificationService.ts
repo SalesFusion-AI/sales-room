@@ -1,4 +1,5 @@
 import type { QualificationSchema, QualificationCriterion, QualificationStatus, Message } from '../types';
+import { getQualificationConfig } from '../../qualification.config';
 
 // Default BANT Schema
 export const DEFAULT_BANT_SCHEMA: QualificationSchema = {
@@ -75,9 +76,10 @@ export const SAAS_QUALIFICATION_SCHEMA: QualificationSchema = {
 
 export class QualificationService {
   private currentSchema: QualificationSchema;
+  private config = getQualificationConfig();
 
   constructor(schema: QualificationSchema = DEFAULT_BANT_SCHEMA) {
-    this.currentSchema = schema;
+    this.currentSchema = this.createSchemaFromConfig();
   }
 
   // Initialize qualification status with current schema
@@ -196,13 +198,29 @@ export class QualificationService {
     return updatedStatus;
   }
 
-  // Helper methods for signal detection
+  // Create qualification schema from config
+  private createSchemaFromConfig(): QualificationSchema {
+    const criteria = Object.entries(this.config.criteria).map(([id, config]) => ({
+      id,
+      name: id.charAt(0).toUpperCase() + id.slice(1),
+      description: `${config.required ? 'Required: ' : ''}Evaluates ${id} signals`,
+      weight: config.weight / 100, // Convert percentage to decimal
+      status: 'unknown' as const,
+      confidence: 0,
+      evidence: []
+    }));
+
+    return {
+      id: 'config-based',
+      name: 'Configurable Qualification',
+      scoreThreshold: this.config.thresholds.showTalkToSales,
+      criteria
+    };
+  }
+
+  // Helper methods for signal detection (using config keywords)
   private detectsBudgetSignals(text: string): boolean {
-    const budgetKeywords = [
-      'budget', 'cost', 'price', 'expensive', 'affordable', 'invest', 
-      'ROI', 'worth', 'value', 'money', 'financial', 'funds', 'allocated'
-    ];
-    return budgetKeywords.some(keyword => text.includes(keyword));
+    return this.config.criteria.budget.keywords.some(keyword => text.includes(keyword));
   }
 
   private assessBudgetStatus(text: string): 'qualified' | 'unqualified' | 'unknown' {
@@ -219,11 +237,7 @@ export class QualificationService {
   }
 
   private detectsAuthoritySignals(text: string): boolean {
-    const authorityKeywords = [
-      'decision', 'decide', 'choose', 'approve', 'manager', 'director', 
-      'CEO', 'CTO', 'owner', 'founder', 'lead', 'responsible', 'authority'
-    ];
-    return authorityKeywords.some(keyword => text.includes(keyword));
+    return this.config.criteria.authority.keywords.some(keyword => text.includes(keyword));
   }
 
   private assessAuthorityStatus(text: string): 'qualified' | 'unqualified' | 'unknown' {
@@ -240,11 +254,7 @@ export class QualificationService {
   }
 
   private detectsNeedSignals(text: string): boolean {
-    const needKeywords = [
-      'problem', 'issue', 'challenge', 'struggle', 'difficult', 'pain', 
-      'frustrat', 'inefficient', 'slow', 'manual', 'broken', 'need help'
-    ];
-    return needKeywords.some(keyword => text.includes(keyword));
+    return this.config.criteria.need ? this.config.criteria.need.keywords.some(keyword => text.includes(keyword)) : false;
   }
 
   private containsNeedKeywords(text: string): boolean {
@@ -252,11 +262,7 @@ export class QualificationService {
   }
 
   private detectsTimelineSignals(text: string): boolean {
-    const timelineKeywords = [
-      'soon', 'urgent', 'immediately', 'asap', 'this month', 'next quarter', 
-      'by end of', 'timeline', 'deadline', 'when', 'schedule'
-    ];
-    return timelineKeywords.some(keyword => text.includes(keyword));
+    return this.config.criteria.timeline.keywords.some(keyword => text.includes(keyword));
   }
 
   private assessTimelineStatus(text: string): 'qualified' | 'unqualified' | 'unknown' {
