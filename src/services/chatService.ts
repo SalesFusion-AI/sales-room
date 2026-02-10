@@ -28,38 +28,92 @@ export async function sendMessage(
   try {
     const { aiModel, aiApiKey } = useSettingsStore.getState();
 
-    const response = await fetch(`${API_URL}/api/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        message,
-        sessionId,
-        context,
-        model: aiModel,
-        apiKey: aiApiKey,
-      }),
-    });
+    // Create AbortController for timeout handling
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => abortController.abort(), 30000); // 30 second timeout
+
+    let response: Response;
+    
+    try {
+      response = await fetch(`${API_URL}/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message,
+          sessionId,
+          context,
+          model: aiModel,
+          apiKey: aiApiKey,
+        }),
+        signal: abortController.signal,
+      });
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      
+      // Handle network errors, timeouts, and CORS issues
+      if (fetchError instanceof Error) {
+        if (fetchError.name === 'AbortError') {
+          throw new Error('Request timeout - please try again');
+        }
+        if (fetchError.message.includes('Failed to fetch') || fetchError.message.includes('NetworkError')) {
+          // Fallback to demo mode for network issues
+          return {
+            success: true,
+            response: getDemoResponse(message),
+            sessionId: sessionId || `demo_${Date.now()}`,
+          };
+        }
+      }
+      throw new Error(`Network error: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`);
+    }
+    
+    clearTimeout(timeoutId);
 
     let data: ChatResponse | { error?: string };
 
     try {
-      data = await response.json();
+      const responseText = await response.text();
+      if (!responseText.trim()) {
+        throw new Error('Empty response from server');
+      }
+      data = JSON.parse(responseText);
     } catch (parseError) {
-      throw new Error('Invalid JSON response from chat service');
+      console.error('JSON parse error:', parseError);
+      throw new Error('Invalid response format from chat service');
     }
 
     if (!response.ok) {
-      throw new Error(data.error || 'Chat request failed');
+      const errorMessage = (data as { error?: string }).error || `HTTP ${response.status}: ${response.statusText}`;
+      throw new Error(errorMessage);
     }
 
-    return data as ChatResponse;
+    // Validate response structure
+    const chatResponse = data as ChatResponse;
+    if (!chatResponse.response || typeof chatResponse.response !== 'string') {
+      throw new Error('Invalid response structure from chat service');
+    }
+
+    return {
+      success: chatResponse.success ?? true,
+      response: chatResponse.response,
+      sessionId: chatResponse.sessionId || sessionId || `session_${Date.now()}`,
+    };
+    
   } catch (error) {
     console.error('Chat service error:', error);
     
-    // Fallback to demo mode if API is unavailable
-    if (error instanceof TypeError && error.message.includes('fetch')) {
+    // For any error, provide fallback behavior
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    
+    // Don't fallback to demo for validation/parsing errors - those indicate real issues
+    if (errorMessage.includes('Invalid response') || errorMessage.includes('timeout')) {
+      throw error;
+    }
+    
+    // Fallback to demo mode for network/fetch errors
+    if (errorMessage.includes('Network') || errorMessage.includes('Failed to fetch')) {
       return {
         success: true,
         response: getDemoResponse(message),
