@@ -3,6 +3,8 @@ import { sendMessage } from '../services/chatService';
 import { qualificationService } from '../services/qualificationService';
 import { demoService } from '../demo/demoService';
 import { validateMessage, validateProspectInfo, sanitizeInput } from '../utils/validation';
+import { notifyQualificationChange, resetNotificationState } from '../services/slackService';
+import { getQualificationConfig } from '../config/qualificationConfig';
 import type { QualificationStatus } from '../types';
 
 interface Message {
@@ -131,10 +133,35 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               }
             }
 
+            // Send Slack notification on significant score changes
+            const config = getQualificationConfig();
+            const scoreDelta = nextScore - s.qualificationScore;
+            if (scoreDelta >= config.slackNotificationThreshold || nextScore >= config.handoffThreshold) {
+              // Get criteria met for notification
+              const criteriaMet: string[] = [];
+              if (nextSignals.budget) criteriaMet.push('Budget');
+              if (nextSignals.timeline) criteriaMet.push('Timeline');
+              if (nextSignals.painPoint) criteriaMet.push('Pain Point');
+              if (nextSignals.nameCompany) criteriaMet.push('Contact Info');
+              if (nextSignals.demoPricing) criteriaMet.push('Demo Interest');
+
+              // Fire and forget - don't block on Slack
+              notifyQualificationChange({
+                prospectName: s.prospectInfo.name,
+                company: s.prospectInfo.company,
+                email: s.prospectInfo.email,
+                score: nextScore,
+                previousScore: s.qualificationScore,
+                criteriaMetCount: criteriaMet.length,
+                criteriaMet,
+                sessionId: s.sessionId,
+              }).catch(() => {}); // Ignore Slack errors
+            }
+
             return {
               qualificationStatus: nextStatus,
               qualificationScore: nextScore,
-              isQualified: nextScore >= 75,
+              isQualified: nextScore >= config.handoffThreshold,
               demoQualificationSignals: nextSignals,
             };
           });
@@ -252,6 +279,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
   
   clearChat: () => {
+    // Reset Slack notification state for new session
+    resetNotificationState();
+    
     set({
       messages: [
         {
