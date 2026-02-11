@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MessageSquareText } from 'lucide-react';
 import { useQualificationScore } from '../../store/chatStore';
 import HandoffModal from './HandoffModal';
@@ -6,8 +6,31 @@ import HandoffModal from './HandoffModal';
 export default function TalkToSalesButton() {
   const qualificationScore = useQualificationScore();
   const [isOpen, setIsOpen] = useState(false);
+  const [forceShow, setForceShow] = useState(false);
 
-  if (qualificationScore <= 75) return null;
+  // Check URL params for demo mode (?demo=true or ?showTalkToSales=true)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('demo') === 'true' || params.get('showTalkToSales') === 'true') {
+      setForceShow(true);
+    }
+  }, []);
+
+  // Also listen for keyboard shortcut (Ctrl+Shift+T) to toggle for demos
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'T') {
+        setForceShow(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const shouldShow = forceShow || qualificationScore > 75;
+  const displayScore = forceShow && qualificationScore <= 75 ? 82 : qualificationScore;
+
+  if (!shouldShow) return null;
 
   return (
     <>
@@ -20,7 +43,7 @@ export default function TalkToSalesButton() {
         </span>
         <span className="flex flex-col text-left leading-tight">
           <span>Talk to Sales</span>
-          <span className="text-xs text-gray-400">{qualificationScore}% qualified</span>
+          <span className="text-xs text-gray-400">{displayScore}% qualified</span>
         </span>
       </button>
 

@@ -4,6 +4,7 @@ import { useChatStore, useMessages, useIsTyping, useProspectInfo, useError } fro
 import TalkToSalesButton from './components/TalkToSales/TalkToSalesButton';
 import SettingsButton from './components/Settings/SettingsButton';
 import SettingsPanel from './components/Settings/SettingsPanel';
+import ContentCard from './components/ContentCard';
 import './App.css';
 
 function App() {
@@ -94,7 +95,7 @@ function App() {
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                className={`flex flex-col ${message.role === 'user' ? 'items-end' : 'items-start'}`}
               >
                 <div
                   className={`max-w-[85%] sm:max-w-sm md:max-w-md px-4 sm:px-5 py-3.5 sm:py-4 rounded-2xl sm:rounded-3xl shadow-lg ${
@@ -110,6 +111,23 @@ function App() {
                     {message.timestamp.toLocaleTimeString()}
                   </p>
                 </div>
+                
+                {/* Content Cards - shown after AI messages */}
+                {message.role === 'assistant' && message.contentCards && message.contentCards.length > 0 && (
+                  <div className="mt-3 space-y-2 max-w-[85%] sm:max-w-sm md:max-w-md">
+                    {message.contentCards.map((card) => (
+                      <ContentCard 
+                        key={card.id} 
+                        card={card} 
+                        onAction={(c) => {
+                          if (c.url && c.url !== '#') {
+                            window.open(c.url, '_blank');
+                          }
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
 

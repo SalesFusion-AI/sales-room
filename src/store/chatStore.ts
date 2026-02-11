@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { sendMessage } from '../services/chatService';
 import { qualificationService } from '../services/qualificationService';
 import { demoService } from '../demo/demoService';
+import { getRelevantContent, type ContentCardData } from '../components/ContentCard';
 import type { QualificationStatus } from '../types';
 
 interface Message {
@@ -9,6 +10,7 @@ interface Message {
   content: string;
   role: 'user' | 'assistant';
   timestamp: Date;
+  contentCards?: ContentCardData[];
 }
 
 interface ProspectInfo {
@@ -139,12 +141,16 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         previousMessages,
       });
       
-      // Add AI response
+      // Add AI response with relevant content cards
+      // Check both user message and AI response for content triggers
+      const relevantContent = getRelevantContent(content + ' ' + response.response);
+      
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: response.response,
         role: 'assistant',
         timestamp: new Date(),
+        contentCards: relevantContent.length > 0 ? relevantContent : undefined,
       };
       
       set(s => ({
