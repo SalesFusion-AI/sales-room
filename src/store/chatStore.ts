@@ -35,6 +35,7 @@ interface ChatStore {
     demoPricing: boolean;
   };
   error: string | null;
+  pendingRequestId: string | null;
   
   // Actions
   sendUserMessage: (content: string) => Promise<void>;
@@ -70,27 +71,34 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     demoPricing: false,
   },
   error: null,
+  pendingRequestId: null,
   
   sendUserMessage: async (content: string) => {
+    const requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
     // Add user message immediately
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: requestId,
       content,
       role: 'user',
       timestamp: new Date(),
     };
-    
+
     set(s => ({
       messages: [...s.messages, userMessage],
       isTyping: true,
       error: null,
+      pendingRequestId: requestId,
     }));
 
-    const updateQualificationStatus = async (options?: { messageContent?: string; demoMode?: boolean }) => {
+    const updateQualificationStatus = async (
+      messages: Message[],
+      options?: { messageContent?: string; demoMode?: boolean }
+    ) => {
       const currentState = get();
       try {
         const updated = await qualificationService.assessQualificationFromMessages(
-          currentState.messages,
+          messages,
           currentState.qualificationStatus
         );
 
@@ -122,8 +130,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       }
     };
 
-    await updateQualificationStatus();
-    
+    const messagesSnapshot = get().messages;
+    await updateQualificationStatus(messagesSnapshot);
+
     try {
       const state = get();
 
@@ -132,7 +141,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         role: m.role,
         content: m.content,
       }));
-      
+
       // Call API
       const response = await sendMessage(content, state.sessionId, {
         prospectName: state.prospectInfo.name,
@@ -140,35 +149,44 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         email: state.prospectInfo.email,
         previousMessages,
       });
-      
+
+      if (get().pendingRequestId !== requestId) {
+        return;
+      }
+
       // Add AI response with relevant content cards
       // Check both user message and AI response for content triggers
       const relevantContent = getRelevantContent(content + ' ' + response.response);
-      
+
       const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: `${requestId}-ai`,
         content: response.response,
         role: 'assistant',
         timestamp: new Date(),
         contentCards: relevantContent.length > 0 ? relevantContent : undefined,
       };
-      
+
       set(s => ({
         messages: [...s.messages, aiMessage],
         isTyping: false,
         sessionId: response.sessionId,
+        pendingRequestId: null,
       }));
 
       const demoMode = demoService.isDemoActive() || isDemoSessionId(response.sessionId) || isDemoSessionId(state.sessionId);
-      await updateQualificationStatus({ messageContent: content, demoMode });
-      
+      await updateQualificationStatus([...get().messages, aiMessage], { messageContent: content, demoMode });
+
       // Extract prospect info from conversation if mentioned
       extractProspectInfo(content, set);
-      
+
     } catch (error) {
       console.error('Failed to send message:', error);
+      if (get().pendingRequestId !== requestId) {
+        return;
+      }
       set({
         isTyping: false,
+        pendingRequestId: null,
         error: error instanceof Error ? error.message : 'Failed to send message',
       });
     }
@@ -202,6 +220,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         demoPricing: false,
       },
       error: null,
+      pendingRequestId: null,
     });
   },
 
@@ -268,6 +287,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         demoPricing: true,
       },
       error: null,
+      pendingRequestId: null,
     });
   },
 }));
