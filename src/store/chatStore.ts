@@ -74,12 +74,22 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   pendingRequestId: null,
   
   sendUserMessage: async (content: string) => {
+    const normalizedContent = content.trim();
+    if (!normalizedContent) {
+      set({ error: 'Please enter a message before sending.' });
+      return;
+    }
+    if (normalizedContent.length > 500) {
+      set({ error: 'Message is too long. Please keep it under 500 characters.' });
+      return;
+    }
+
     const requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
     // Add user message immediately
     const userMessage: Message = {
       id: requestId,
-      content,
+      content: normalizedContent,
       role: 'user',
       timestamp: new Date(),
     };
@@ -143,7 +153,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       }));
 
       // Call API
-      const response = await sendMessage(content, state.sessionId, {
+      const response = await sendMessage(normalizedContent, state.sessionId, {
         prospectName: state.prospectInfo.name,
         company: state.prospectInfo.company,
         email: state.prospectInfo.email,
@@ -156,7 +166,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
       // Add AI response with relevant content cards
       // Check both user message and AI response for content triggers
-      const relevantContent = getRelevantContent(content + ' ' + response.response);
+      const relevantContent = getRelevantContent(normalizedContent + ' ' + response.response);
 
       const aiMessage: Message = {
         id: `${requestId}-ai`,
@@ -174,10 +184,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       }));
 
       const demoMode = demoService.isDemoActive() || isDemoSessionId(response.sessionId) || isDemoSessionId(state.sessionId);
-      await updateQualificationStatus([...get().messages, aiMessage], { messageContent: content, demoMode });
+      await updateQualificationStatus([...get().messages, aiMessage], { messageContent: normalizedContent, demoMode });
 
       // Extract prospect info from conversation if mentioned
-      extractProspectInfo(content, set);
+      extractProspectInfo(normalizedContent, set);
 
     } catch (error) {
       console.error('Failed to send message:', error);
