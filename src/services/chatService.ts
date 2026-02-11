@@ -74,7 +74,7 @@ export async function sendMessage(
         const text = await response.text();
         data = text ? ({ error: text } as { error?: string }) : null;
       }
-    } catch (parseError) {
+    } catch {
       throw new ChatServiceError('Invalid response from chat service.', 'parse');
     }
 
