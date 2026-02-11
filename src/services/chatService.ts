@@ -5,6 +5,28 @@
 import { useSettingsStore } from '../store/settingsStore';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const DEFAULT_TIMEOUT_MS = 15000;
+
+class ChatServiceError extends Error {
+  constructor(
+    message: string,
+    public readonly type: 'network' | 'timeout' | 'api' | 'parse'
+  ) {
+    super(message);
+    this.name = 'ChatServiceError';
+  }
+}
+
+async function fetchWithTimeout(input: RequestInfo, init: RequestInit, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 interface ChatContext {
   prospectName?: string;
@@ -28,7 +50,7 @@ export async function sendMessage(
   try {
     const { aiModel, aiApiKey } = useSettingsStore.getState();
 
-    const response = await fetch(`${API_URL}/api/chat`, {
+    const response = await fetchWithTimeout(`${API_URL}/api/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -42,31 +64,46 @@ export async function sendMessage(
       }),
     });
 
-    let data: ChatResponse | { error?: string };
+    let data: ChatResponse | { error?: string } | null = null;
+    const contentType = response.headers.get('content-type') || '';
 
     try {
-      data = await response.json();
+      if (contentType.includes('application/json')) {
+        data = (await response.json()) as ChatResponse | { error?: string };
+      } else {
+        const text = await response.text();
+        data = text ? ({ error: text } as { error?: string }) : null;
+      }
     } catch (parseError) {
-      throw new Error('Invalid JSON response from chat service');
+      throw new ChatServiceError('Invalid response from chat service.', 'parse');
     }
 
     if (!response.ok) {
-      throw new Error(data.error || 'Chat request failed');
+      const apiError = data?.error || `Chat request failed (${response.status})`;
+      throw new ChatServiceError(apiError, 'api');
+    }
+
+    if (!data || !(data as ChatResponse).response) {
+      throw new ChatServiceError('Chat response was empty.', 'parse');
     }
 
     return data as ChatResponse;
   } catch (error) {
     console.error('Chat service error:', error);
-    
-    // Fallback to demo mode if API is unavailable
-    if (error instanceof TypeError && error.message.includes('fetch')) {
+
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new ChatServiceError('Chat request timed out. Please try again.', 'timeout');
+    }
+
+    if (error instanceof TypeError) {
+      // Fallback to demo mode if API is unavailable
       return {
         success: true,
         response: getDemoResponse(message),
         sessionId: sessionId || `demo_${Date.now()}`,
       };
     }
-    
+
     throw error;
   }
 }
