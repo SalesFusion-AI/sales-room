@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, MessageSquare, User, AlertCircle } from 'lucide-react';
-import { useChatStore, useMessages, useIsTyping, useProspectInfo, useError } from './store/chatStore';
+import { shallow } from 'zustand/shallow';
+import { useChatStore } from './store/chatStore';
 import TalkToSalesButton from './components/TalkToSales/TalkToSalesButton';
 import SettingsButton from './components/Settings/SettingsButton';
 import SettingsPanel from './components/Settings/SettingsPanel';
@@ -8,11 +9,16 @@ import ContentCard from './components/ContentCard';
 import './App.css';
 
 function App() {
-  const sendUserMessage = useChatStore(s => s.sendUserMessage);
-  const messages = useMessages();
-  const isTyping = useIsTyping();
-  const prospectInfo = useProspectInfo();
-  const error = useError();
+  const { sendUserMessage, messages, isTyping, prospectInfo, error } = useChatStore(
+    s => ({
+      sendUserMessage: s.sendUserMessage,
+      messages: s.messages,
+      isTyping: s.isTyping,
+      prospectInfo: s.prospectInfo,
+      error: s.error,
+    }),
+    shallow
+  );
   const [inputMessage, setInputMessage] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -22,27 +28,34 @@ function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  const handleSendMessage = async () => {
-    if (inputMessage.trim() && !isTyping) {
-      const message = inputMessage;
-      setInputMessage('');
-      await sendUserMessage(message);
+  const handleSendMessage = useCallback(async () => {
+    if (!inputMessage.trim() || isTyping) {
+      return;
     }
-  };
+    const message = inputMessage;
+    setInputMessage('');
+    await sendUserMessage(message);
+  }, [inputMessage, isTyping, sendUserMessage]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        void handleSendMessage();
+      }
+    },
+    [handleSendMessage]
+  );
 
-  const handlePromptClick = (prompt: string) => {
-    if (!isTyping) {
-      setInputMessage('');
-      sendUserMessage(prompt);
-    }
-  };
+  const handlePromptClick = useCallback(
+    (prompt: string) => {
+      if (!isTyping) {
+        setInputMessage('');
+        void sendUserMessage(prompt);
+      }
+    },
+    [isTyping, sendUserMessage]
+  );
 
   return (
     <div className="min-h-screen h-[100svh] text-[var(--text-primary)] flex flex-col overflow-hidden relative z-10">
