@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import { X, PhoneCall, Calendar, UserCheck } from 'lucide-react';
+import { useChatStore, useQualificationScore } from '../../store/chatStore';
+import { notifyHandoffReady } from '../../services/slackService';
 
 type RepStatus = 'available' | 'busy' | 'offline';
 
@@ -26,6 +28,9 @@ const statusStyles: Record<RepStatus, { label: string; className: string }> = {
 export default function HandoffModal({ open, onClose }: HandoffModalProps) {
   const [status, setStatus] = useState<RepStatus>('available');
   const [calendlyLink, setCalendlyLink] = useState('https://calendly.com/salesfusion');
+  const [connecting, setConnecting] = useState(false);
+  const prospectInfo = useChatStore(s => s.prospectInfo);
+  const qualificationScore = useQualificationScore();
 
   const showSchedule = status !== 'available';
   const statusBadge = useMemo(() => statusStyles[status], [status]);
@@ -88,9 +93,28 @@ export default function HandoffModal({ open, onClose }: HandoffModalProps) {
           {!showSchedule && (
             <div className="rounded-2xl border border-gray-800 bg-gray-950 p-5">
               <p className="text-sm text-gray-300">A rep is ready to jump in right now.</p>
-              <button className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-600 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:from-blue-600 hover:to-purple-700">
+              <button 
+                onClick={async () => {
+                  setConnecting(true);
+                  // Notify sales team via Slack
+                  await notifyHandoffReady(
+                    prospectInfo.name,
+                    prospectInfo.company,
+                    prospectInfo.email,
+                    qualificationScore
+                  );
+                  // In production, this would initiate a real connection
+                  // For now, show confirmation
+                  setTimeout(() => {
+                    setConnecting(false);
+                    alert('A sales rep has been notified and will connect shortly!');
+                  }, 1000);
+                }}
+                disabled={connecting}
+                className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-600 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:from-blue-600 hover:to-purple-700 disabled:opacity-50"
+              >
                 <PhoneCall className="h-4 w-4" />
-                Connect Now
+                {connecting ? 'Connecting...' : 'Connect Now'}
               </button>
             </div>
           )}
