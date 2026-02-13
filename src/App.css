@@ -8,11 +8,16 @@
 }
 
 .app-heading {
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
+  text-transform: none;
 }
 
 .glass-shadow {
   box-shadow: var(--shadow-soft);
+}
+
+.lux-transition {
+  transition: all 0.4s ease;
 }
 
 /* Fade in animation for Talk to Sales button */
