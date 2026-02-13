@@ -1,17 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Clock, 
   User, 
   Bot, 
   Search, 
-  Filter, 
   Download, 
   Share, 
-  Star,
   MessageSquare,
   Calendar,
   Phone,
-  ExternalLink,
   ChevronDown,
   ChevronRight,
   Sparkles,
@@ -38,60 +35,83 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
   showActions = true,
   showSummary = true
 }) => {
-  const [conversation, setConversation] = useState<StoredConversation | null>(providedConversation || null);
-  const [summary, setSummary] = useState<TranscriptSummary | null>(null);
+  const resolvedConversation = useMemo(() => {
+    if (providedConversation) return providedConversation;
+    if (sessionId) return transcriptService.getConversationBySessionId(sessionId);
+    return null;
+  }, [providedConversation, sessionId]);
+
+  const cachedSummary = useMemo(() => {
+    if (!resolvedConversation) return null;
+    return transcriptService.getSummary(resolvedConversation.sessionId);
+  }, [resolvedConversation]);
+
+  const [generatedSummary, setGeneratedSummary] = useState<TranscriptSummary | null>(null);
+  const summary = generatedSummary ?? cachedSummary;
   const [searchTerm, setSearchTerm] = useState('');
-  const [highlightedMessages, setHighlightedMessages] = useState<Set<string>>(new Set());
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['messages', 'summary']));
   const [loading, setLoading] = useState(false);
 
-  // Load conversation if sessionId provided
+  // Load or generate summary when needed
   useEffect(() => {
-    if (sessionId && !providedConversation) {
-      const storedConversation = transcriptService.getConversationBySessionId(sessionId);
-      if (storedConversation) {
-        setConversation(storedConversation);
-        
-        // Load or generate summary
-        const existingSummary = transcriptService.getSummary(sessionId);
-        if (!existingSummary) {
-          setLoading(true);
-          transcriptService.generateSummary(storedConversation).then(newSummary => {
-            setSummary(newSummary);
-            setLoading(false);
-          });
-        } else {
-          setSummary(existingSummary);
-        }
-      }
-    } else if (providedConversation) {
-      setConversation(providedConversation);
-      // Load summary if exists
-      const existingSummary = transcriptService.getSummary(providedConversation.sessionId);
-      if (existingSummary) {
-        setSummary(existingSummary);
-      }
+    if (!resolvedConversation) {
+      const timeoutId = setTimeout(() => {
+        setGeneratedSummary(null);
+        setLoading(false);
+      }, 0);
+      return () => clearTimeout(timeoutId);
     }
-  }, [sessionId, providedConversation]);
 
-  // Handle search
-  useEffect(() => {
-    if (!searchTerm || !conversation) {
-      setHighlightedMessages(new Set());
-      return;
+    if (cachedSummary) {
+      const timeoutId = setTimeout(() => {
+        setGeneratedSummary(null);
+        setLoading(false);
+      }, 0);
+      return () => clearTimeout(timeoutId);
+    }
+
+    let active = true;
+    const timeoutId = setTimeout(() => {
+      setLoading(true);
+    }, 0);
+    
+    transcriptService
+      .generateSummary(resolvedConversation)
+      .then(newSummary => {
+        if (active) {
+          setGeneratedSummary(newSummary);
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+      clearTimeout(timeoutId);
+    };
+  }, [resolvedConversation, cachedSummary]);
+
+  const highlightedMessages = useMemo(() => {
+    if (!searchTerm || !resolvedConversation) {
+      return new Set<string>();
     }
 
     const highlighted = new Set<string>();
     const lowerSearchTerm = searchTerm.toLowerCase();
-    
-    conversation.messages.forEach(message => {
+
+    resolvedConversation.messages.forEach(message => {
       if (message.content.toLowerCase().includes(lowerSearchTerm)) {
         highlighted.add(message.id);
       }
     });
-    
-    setHighlightedMessages(highlighted);
-  }, [searchTerm, conversation]);
+
+    return highlighted;
+  }, [searchTerm, resolvedConversation]);
+
+  const conversation = resolvedConversation;
 
   const toggleSection = (sectionId: string) => {
     setExpandedSections(prev => {
@@ -429,7 +449,7 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {conversation.messages.map((message, index) => (
+            {conversation.messages.map((message) => (
               <div
                 key={message.id}
                 className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} ${

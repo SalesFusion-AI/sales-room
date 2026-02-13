@@ -1,6 +1,6 @@
 import { transcriptService } from '../services/transcriptService';
 import { handoffService } from '../services/handoffService';
-import { setExpiringSessionItem, getExpiringSessionItem, removeSessionItem, setSessionItem, getSessionItem } from '../utils/sessionStorage';
+import { setExpiringSessionItem, removeSessionItem, setSessionItem, getSessionItem } from '../utils/sessionStorage';
 import { 
   DEMO_CONVERSATIONS, 
   DEMO_SUMMARIES, 
@@ -378,11 +378,19 @@ export const demoService = new DemoService();
 
 // Make available on window for webinar use
 if (typeof window !== 'undefined') {
-  (window as any).demoService = demoService;
-  (window as any).startDemo = () => demoService.initializeDemoEnvironment();
-  (window as any).startWebinar = () => demoService.startWebinar();
-  (window as any).nextStep = () => demoService.nextStep();
-  (window as any).prevStep = () => demoService.prevStep();
+  const demoWindow = window as Window & {
+    demoService: DemoService;
+    startDemo: () => Promise<void>;
+    startWebinar: () => void;
+    nextStep: () => void;
+    prevStep: () => void;
+  };
+
+  demoWindow.demoService = demoService;
+  demoWindow.startDemo = () => demoService.initializeDemoEnvironment();
+  demoWindow.startWebinar = () => demoService.startWebinar();
+  demoWindow.nextStep = () => demoService.nextStep();
+  demoWindow.prevStep = () => demoService.prevStep();
 }
 
 export default demoService;

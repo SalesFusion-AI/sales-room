@@ -165,12 +165,12 @@ export class TranscriptService {
       }
       
       const transcripts = stored;
-      return transcripts.map((t: any) => ({
+      return transcripts.map((t) => ({
         ...t,
         createdAt: new Date(t.createdAt),
         updatedAt: new Date(t.updatedAt),
         lastActivity: new Date(t.lastActivity),
-        messages: t.messages.map((m: any) => ({
+        messages: t.messages.map((m) => ({
           ...m,
           timestamp: new Date(m.timestamp)
         }))
@@ -267,7 +267,7 @@ export class TranscriptService {
       }
       
       const summaries = stored;
-      return summaries.map((s: any) => ({
+      return summaries.map((s) => ({
         ...s,
         generatedAt: new Date(s.generatedAt),
       }));

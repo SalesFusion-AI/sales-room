@@ -15,6 +15,7 @@ import {
   Star,
   Zap
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { demoService } from '../../demo/demoService';
 import { transcriptService } from '../../services/transcriptService';
 
@@ -23,13 +24,45 @@ interface MetricCard {
   value: string | number;
   change?: number;
   changeLabel?: string;
-  icon: React.ComponentType<any>;
+  icon: LucideIcon;
   color: string;
   description: string;
 }
 
+interface WeeklyTrend {
+  week: string;
+  conversations: number;
+  qualified: number;
+  booked: number;
+}
+
+interface TopIndustry {
+  name: string;
+  percentage: number;
+  count: number;
+}
+
+interface AnalyticsData {
+  conversationsStarted?: number;
+  totalConversations: number;
+  qualificationRate?: number;
+  callsBooked?: number;
+  averageQualificationScore?: number;
+  avgQualificationScore?: number;
+  hotLeads: number;
+  warmLeads: number;
+  coldLeads: number;
+  weeklyTrends?: WeeklyTrend[];
+  topIndustries?: TopIndustry[];
+  conversionRate?: number;
+  averageSessionDuration?: number;
+  averageMessagesPerSession?: number;
+  avgMessageCount?: number;
+  crmSyncedCount: number;
+}
+
 const AnalyticsDashboard: React.FC = () => {
-  const [analytics, setAnalytics] = useState<any>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
 
@@ -308,7 +341,7 @@ const AnalyticsDashboard: React.FC = () => {
           
           {analytics.weeklyTrends && (
             <div className="space-y-4">
-              {analytics.weeklyTrends.map((week: any, index: number) => (
+              {analytics.weeklyTrends.map((week, index) => (
                 <div key={index} className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-medium text-gray-700">{week.week}</span>
@@ -370,7 +403,7 @@ const AnalyticsDashboard: React.FC = () => {
           
           {analytics.topIndustries && (
             <div className="space-y-3">
-              {analytics.topIndustries.map((industry: any, index: number) => (
+              {analytics.topIndustries.map((industry, index) => (
                 <div key={index} className="space-y-1">
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-medium text-gray-700">{industry.name}</span>

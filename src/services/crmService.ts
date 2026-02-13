@@ -1,7 +1,7 @@
 import type { 
+  Message,
   StoredConversation, 
-  TranscriptSummary, 
-  ProspectInfo 
+  TranscriptSummary 
 } from '../types';
 
 export interface CRMConfig {
@@ -267,7 +267,7 @@ export class CRMService {
   }
 
   // Format conversation transcript
-  private formatTranscript(messages: any[]): string {
+  private formatTranscript(messages: Message[]): string {
     return messages
       .map(msg => `[${msg.timestamp.toLocaleTimeString()}] ${msg.role.toUpperCase()}: ${msg.content}`)
       .join('\n\n');
@@ -308,7 +308,7 @@ export class CRMService {
   }
 
   // Calculate conversation duration
-  private calculateDuration(messages: any[]): number {
+  private calculateDuration(messages: Message[]): number {
     if (messages.length < 2) return 0;
     const start = messages[0].timestamp.getTime();
     const end = messages[messages.length - 1].timestamp.getTime();
@@ -323,10 +323,10 @@ export class CRMService {
 
     // Map to Salesforce fields
     const mapping = this.config.fieldMapping || CRM_CONFIGS.salesforce.fieldMapping!;
-    const salesforceData = this.mapFields(leadData, mapping);
+    this.mapFields(leadData, mapping); // Prepare data for future real API implementation
 
     // Mock Salesforce API call (replace with real implementation)
-    const response = await this.mockSalesforceAPI(salesforceData);
+    const response = await this.mockSalesforceAPI();
     
     return {
       success: true,
@@ -344,10 +344,10 @@ export class CRMService {
 
     // Map to HubSpot fields
     const mapping = this.config.fieldMapping || CRM_CONFIGS.hubspot.fieldMapping!;
-    const hubspotData = this.mapFields(leadData, mapping);
+    this.mapFields(leadData, mapping); // Prepare data for future real API implementation
 
     // Mock HubSpot API call
-    const response = await this.mockHubspotAPI(hubspotData);
+    const response = await this.mockHubspotAPI();
     
     return {
       success: true,
@@ -365,10 +365,10 @@ export class CRMService {
 
     // Map to Pipedrive fields
     const mapping = this.config.fieldMapping || CRM_CONFIGS.pipedrive.fieldMapping!;
-    const pipedriveData = this.mapFields(leadData, mapping);
+    this.mapFields(leadData, mapping); // Prepare data for future real API implementation
 
     // Mock Pipedrive API call
-    const response = await this.mockPipedriveAPI(pipedriveData);
+    const response = await this.mockPipedriveAPI();
     
     return {
       success: true,
@@ -414,13 +414,13 @@ export class CRMService {
   }
 
   // Map lead data fields according to CRM field mapping
-  private mapFields(data: CRMLeadData, mapping: CRMFieldMapping): Record<string, any> {
-    const mapped: Record<string, any> = {};
-    
+  private mapFields(data: CRMLeadData, mapping: CRMFieldMapping): Record<string, unknown> {
+    const mapped: Record<string, unknown> = {};
+
     // Map standard fields
     Object.entries(mapping).forEach(([sourceField, targetField]) => {
       if (targetField && sourceField in data) {
-        const value = (data as any)[sourceField];
+        const value = (data as Record<string, unknown>)[sourceField];
         if (value !== undefined && value !== null && value !== '') {
           // Handle arrays (tags, pain points)
           if (Array.isArray(value)) {
@@ -436,17 +436,17 @@ export class CRMService {
   }
 
   // Mock API implementations (replace with real ones)
-  private async mockSalesforceAPI(data: any): Promise<{ id: string }> {
+  private async mockSalesforceAPI(): Promise<{ id: string }> {
     await this.delay(200);
     return { id: `SF_${Date.now()}` };
   }
 
-  private async mockHubspotAPI(data: any): Promise<{ id: string }> {
+  private async mockHubspotAPI(): Promise<{ id: string }> {
     await this.delay(150);
     return { id: `HS_${Date.now()}` };
   }
 
-  private async mockPipedriveAPI(data: any): Promise<{ id: string }> {
+  private async mockPipedriveAPI(): Promise<{ id: string }> {
     await this.delay(100);
     return { id: `PD_${Date.now()}` };
   }

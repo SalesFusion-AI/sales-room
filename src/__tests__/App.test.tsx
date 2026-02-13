@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import App from '../App';
 
 vi.mock('../store/chatStore', () => ({
-  useChatStore: (selector: (state: any) => any) => selector({
+  useChatStore: (selector: (state: unknown) => unknown) => selector({
     sendUserMessage: vi.fn()
   }),
   useMessages: () => ([

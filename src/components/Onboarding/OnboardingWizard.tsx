@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Building
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { demoService } from '../../demo/demoService';
 import { getSessionItem } from '../../utils/sessionStorage';
 
@@ -22,9 +23,19 @@ interface OnboardingStep {
   id: string;
   title: string;
   description: string;
-  icon: React.ComponentType<any>;
+  icon: LucideIcon;
   completed: boolean;
   optional?: boolean;
+}
+
+interface OnboardingCustomCriterion {
+  id: string;
+  label: string;
+}
+
+interface SalesTeamMember {
+  name: string;
+  role: string;
 }
 
 interface OnboardingConfig {
@@ -42,14 +53,14 @@ interface OnboardingConfig {
   qualification: {
     schema: 'bant' | 'custom';
     scoreThreshold: number;
-    customCriteria: any[];
+    customCriteria: OnboardingCustomCriterion[];
   };
   knowledgeBase: {
     uploadedFiles: number;
     trainedOnContent: boolean;
   };
   salesTeam: {
-    members: any[];
+    members: SalesTeamMember[];
     calendarsConnected: number;
   };
   integrations: {
@@ -101,20 +112,18 @@ const OnboardingWizard: React.FC = () => {
     }
   });
   
-  const [isDemo, setIsDemo] = useState(false);
+  const [isDemo] = useState(() => demoService.isDemoActive());
 
   useEffect(() => {
-    // Check if we're in demo mode
-    setIsDemo(demoService.isDemoActive());
-    
+    if (!isDemo) return;
+
     // Load demo onboarding data if available
-    if (demoService.isDemoActive()) {
-      const demoOnboarding = getSessionItem('demo_onboarding');
-      if (demoOnboarding) {
-        const demoData = JSON.parse(demoOnboarding);
-        // Pre-populate with demo data
-        setConfig({
-          ...config,
+    const demoOnboarding = getSessionItem('demo_onboarding');
+    if (demoOnboarding) {
+      // Use a timeout to avoid synchronous setState in effect
+      const timeoutId = setTimeout(() => {
+        setConfig(prev => ({
+          ...prev,
           company: {
             name: 'TechFlow Solutions',
             industry: 'Software Development',
@@ -152,10 +161,12 @@ const OnboardingWizard: React.FC = () => {
             customDomain: 'sales.techflow.com',
             configured: false
           }
-        });
-      }
+        }));
+      }, 0);
+
+      return () => clearTimeout(timeoutId);
     }
-  }, []);
+  }, [isDemo]);
 
   const steps: OnboardingStep[] = [
     {
@@ -419,7 +430,7 @@ const OnboardingWizard: React.FC = () => {
                     name="schema"
                     value="bant"
                     checked={config.qualification.schema === 'bant'}
-                    onChange={(e) => setConfig({
+                    onChange={() => setConfig({
                       ...config,
                       qualification: { ...config.qualification, schema: 'bant' as const }
                     })}
@@ -437,7 +448,7 @@ const OnboardingWizard: React.FC = () => {
                     name="schema"
                     value="custom"
                     checked={config.qualification.schema === 'custom'}
-                    onChange={(e) => setConfig({
+                    onChange={() => setConfig({
                       ...config,
                       qualification: { ...config.qualification, schema: 'custom' as const }
                     })}
