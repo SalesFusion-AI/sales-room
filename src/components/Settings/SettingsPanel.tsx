@@ -106,19 +106,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
       <button
         type="button"
         aria-label="Close settings"
-        className="absolute inset-0 bg-black/60"
+        className="absolute inset-0 bg-black/75 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative ml-auto flex h-full w-full max-w-md flex-col border-l border-gray-800 bg-gray-900 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-gray-800 px-6 py-5">
+      <div className="relative ml-auto flex h-full w-full max-w-md flex-col border-l border-[#222] bg-[#0b0b0b]/95 backdrop-blur-[24px] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[#222] px-6 py-5">
           <div>
-            <h2 className="text-lg font-semibold text-white">AI Settings</h2>
+            <h2 className="text-lg font-semibold text-white font-display">AI Settings</h2>
             <p className="text-sm text-gray-400">Configure your model and credentials.</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-800 hover:text-white"
+            className="rounded-lg p-2 text-gray-400 transition hover:bg-[#1a1a1a] hover:text-white"
             aria-label="Close settings panel"
           >
             <X className="h-5 w-5" />
@@ -131,10 +131,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
             <select
               value={draftModel}
               onChange={(event) => setDraftModel(event.target.value)}
-              className="w-full rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-sm text-gray-100 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="w-full rounded-xl border border-[#222] bg-[#111] px-4 py-3 text-sm text-gray-100 focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-white/10"
             >
               {MODEL_OPTIONS.map((option) => (
-                <option key={option} value={option} className="bg-gray-800">
+                <option key={option} value={option} className="bg-[#111]">
                   {option}
                 </option>
               ))}
@@ -148,18 +148,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
               value={draftKey}
               onChange={(event) => setDraftKey(event.target.value)}
               placeholder="sk-..."
-              className="w-full rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-sm text-gray-100 placeholder:text-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="w-full rounded-xl border border-[#222] bg-[#111] px-4 py-3 text-sm text-gray-100 placeholder:text-gray-500 focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-white/10"
             />
             <p className="text-xs text-gray-500">Stored locally in your browser.</p>
           </div>
 
           {status && (
             <div
-              className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm ${
-                status.type === 'success'
-                  ? 'border-emerald-700/60 bg-emerald-900/30 text-emerald-200'
-                  : 'border-rose-700/60 bg-rose-900/30 text-rose-200'
-              }`}
+              className="flex items-start gap-2 rounded-xl border border-[#222] bg-[#111]/70 px-4 py-3 text-sm text-gray-200"
             >
               {status.type === 'success' ? (
                 <CheckCircle2 className="mt-0.5 h-4 w-4" />
@@ -171,12 +167,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
           )}
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-gray-800 px-6 py-5">
+        <div className="flex flex-col gap-3 border-t border-[#222] px-6 py-5">
           <button
             type="button"
             onClick={handleLoadDemo}
             disabled={isLoadingDemo}
-            className="w-full rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-sm font-medium text-gray-200 transition hover:border-gray-600 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-center gap-2"
+            className="w-full rounded-xl border border-[#222] bg-[#111] px-4 py-3 text-sm font-medium text-gray-200 transition hover:border-white/20 hover:bg-[#1a1a1a] disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-center gap-2"
           >
             <Play className="h-4 w-4" />
             {isLoadingDemo ? 'Loading demo scenarios...' : 'Load Demo Scenario'}
@@ -185,14 +181,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
             type="button"
             onClick={handleTestConnection}
             disabled={isTesting}
-            className="w-full rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-sm font-medium text-gray-200 transition hover:border-gray-600 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-xl border border-[#222] bg-[#111] px-4 py-3 text-sm font-medium text-gray-200 transition hover:border-white/20 hover:bg-[#1a1a1a] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isTesting ? 'Testing connection...' : 'Test connection'}
           </button>
           <button
             type="button"
             onClick={handleSave}
-            className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 px-4 py-3 text-sm font-semibold text-white shadow-lg transition hover:from-blue-600 hover:to-purple-700"
+            className="w-full rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black shadow-lg transition hover:bg-[#f5f5f5]"
           >
             Save settings
           </button>

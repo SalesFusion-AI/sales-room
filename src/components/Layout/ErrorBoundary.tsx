@@ -98,30 +98,30 @@ class ErrorBoundary extends Component<Props, State> {
 
       // Default error UI
       return (
-        <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div className="min-h-screen bg-black text-white flex flex-col justify-center py-12 sm:px-6 lg:px-8">
           <div className="sm:mx-auto sm:w-full sm:max-w-md">
-            <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+            <div className="bg-[#111] border border-[#222] py-8 px-4 shadow-2xl sm:rounded-lg sm:px-10">
               <div className="text-center">
-                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
-                  <AlertTriangle className="h-6 w-6 text-red-600" />
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-white/10 mb-4">
+                  <AlertTriangle className="h-6 w-6 text-white" />
                 </div>
                 
-                <h2 className="text-lg font-medium text-gray-900 mb-2">
+                <h2 className="text-lg font-medium text-white mb-2 font-display">
                   Something went wrong
                 </h2>
                 
-                <p className="text-sm text-gray-600 mb-6">
+                <p className="text-sm text-gray-400 mb-6">
                   We encountered an unexpected error. This has been logged and our team will investigate.
                 </p>
 
                 {/* Error details for development */}
                 {process.env.NODE_ENV === 'development' && this.state.error && (
                   <div className="mb-6 text-left">
-                    <details className="bg-red-50 border border-red-200 rounded p-3">
-                      <summary className="text-sm font-medium text-red-800 cursor-pointer">
+                    <details className="bg-[#0b0b0b] border border-[#222] rounded p-3">
+                      <summary className="text-sm font-medium text-gray-200 cursor-pointer">
                         Error Details
                       </summary>
-                      <div className="mt-2 text-xs text-red-700 font-mono whitespace-pre-wrap break-all">
+                      <div className="mt-2 text-xs text-gray-400 font-mono whitespace-pre-wrap break-all">
                         {this.state.error.toString()}
                         {this.state.error.stack && (
                           <div className="mt-2 border-t border-red-200 pt-2">
@@ -136,7 +136,7 @@ class ErrorBoundary extends Component<Props, State> {
                 <div className="space-y-3">
                   <button
                     onClick={this.handleRefresh}
-                    className="w-full flex justify-center items-center space-x-2 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                    className="w-full flex justify-center items-center space-x-2 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-black bg-white hover:bg-[#f5f5f5] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white/20 transition-colors"
                   >
                     <RefreshCw className="h-4 w-4" />
                     <span>Refresh Page</span>
@@ -144,7 +144,7 @@ class ErrorBoundary extends Component<Props, State> {
                   
                   <button
                     onClick={this.handleGoHome}
-                    className="w-full flex justify-center items-center space-x-2 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                    className="w-full flex justify-center items-center space-x-2 py-2 px-4 border border-[#222] rounded-md shadow-sm text-sm font-medium text-gray-200 bg-[#111] hover:bg-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white/10 transition-colors"
                   >
                     <Home className="h-4 w-4" />
                     <span>Go to Home</span>
@@ -152,7 +152,7 @@ class ErrorBoundary extends Component<Props, State> {
 
                   <button
                     onClick={this.handleReportError}
-                    className="w-full flex justify-center items-center space-x-2 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                    className="w-full flex justify-center items-center space-x-2 py-2 px-4 border border-[#222] rounded-md shadow-sm text-sm font-medium text-gray-200 bg-[#111] hover:bg-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white/10 transition-colors"
                   >
                     <MessageSquare className="h-4 w-4" />
                     <span>Report Issue</span>

@@ -16,14 +16,14 @@ export default function TalkToSalesButton() {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-3 rounded-full border border-gray-800 bg-gray-900/90 px-5 py-3 text-sm font-semibold text-white shadow-2xl backdrop-blur transition hover:border-gray-700 hover:bg-gray-800/90 animate-fade-in"
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-3 rounded-full border border-[#222] bg-[#111]/90 px-5 py-3 text-sm font-semibold text-white shadow-2xl backdrop-blur transition hover:border-white/20 hover:bg-[#1a1a1a] animate-fade-in"
       >
-        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-lg">
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-black shadow-lg">
           <MessageSquareText className="h-5 w-5" />
         </span>
         <span className="flex flex-col text-left leading-tight">
           <span>Talk to Sales</span>
-          <span className="text-xs text-gray-400">Ready when you are</span>
+          <span className="text-xs text-[var(--text-secondary)]">Ready when you are</span>
         </span>
       </button>
 

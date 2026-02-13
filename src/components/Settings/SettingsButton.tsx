@@ -12,7 +12,7 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({ onClick, className }) =
       type="button"
       onClick={onClick}
       aria-label="Open settings"
-      className={`inline-flex items-center justify-center rounded-xl border border-gray-700 bg-gray-800/70 p-2.5 text-gray-300 transition hover:border-gray-600 hover:bg-gray-700 hover:text-white ${className ?? ''}`}
+      className={`inline-flex items-center justify-center rounded-xl border border-[#222] bg-[#111]/70 p-2.5 text-gray-300 transition hover:border-white/20 hover:bg-[#1a1a1a] hover:text-white ${className ?? ''}`}
     >
       <Settings className="h-5 w-5" />
     </button>
