@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { sendMessage } from '../services/chatService';
+import { sendMessage, ChatServiceError } from '../services/chatService';
 import { qualificationService } from '../services/qualificationService';
 import { demoService } from '../demo/demoService';
 import { validateMessage, validateProspectInfo, sanitizeInput } from '../utils/validation';
@@ -36,13 +36,20 @@ interface ChatStore {
     demoPricing: boolean;
   };
   error: string | null;
+  pendingRequestId: string | null;
+  lastMessageTimestamp: number;
   
   // Actions
   sendUserMessage: (content: string) => Promise<void>;
   setProspectInfo: (info: Partial<ProspectInfo>) => void;
   clearChat: () => void;
   loadDemoScenario: () => Promise<void>;
+  clearError: () => void;
 }
+
+// Debouncing to prevent rapid-fire messages
+const DEBOUNCE_DELAY = 500; // 500ms debounce
+let debounceTimeout: NodeJS.Timeout | null = null;
 
 export const useChatStore = create<ChatStore>((set, get) => ({
   messages: [
@@ -71,8 +78,32 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     demoPricing: false,
   },
   error: null,
+  pendingRequestId: null,
+  lastMessageTimestamp: 0,
   
   sendUserMessage: async (content: string) => {
+    const currentTime = Date.now();
+    const state = get();
+    
+    // Debounce to prevent rapid-fire messages
+    if (currentTime - state.lastMessageTimestamp < DEBOUNCE_DELAY) {
+      return; // Silently ignore too frequent messages
+    }
+
+    // Clear any existing debounce timeout
+    if (debounceTimeout) {
+      clearTimeout(debounceTimeout);
+      debounceTimeout = null;
+    }
+
+    // If already processing a request, ignore this one
+    if (state.isTyping || state.pendingRequestId) {
+      return;
+    }
+
+    // Generate unique request ID to prevent stale responses
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
     try {
       // Validate and sanitize input
       const validation = validateMessage(content, { maxLength: 500, minLength: 1 });
@@ -98,6 +129,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         messages: [...s.messages, userMessage],
         isTyping: true,
         error: null,
+        pendingRequestId: requestId,
+        lastMessageTimestamp: currentTime,
       }));
 
       // Extract prospect info early from user message
@@ -106,6 +139,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       const updateQualificationStatus = async (options?: { messageContent?: string; demoMode?: boolean }) => {
         try {
           const currentState = get();
+          
+          // Check if this request is still current
+          if (currentState.pendingRequestId !== requestId) {
+            return; // Request has been superseded
+          }
+          
           const updated = await qualificationService.assessQualificationFromMessages(
             currentState.messages,
             currentState.qualificationStatus
@@ -113,6 +152,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
           // Use functional update to avoid stale state
           set(s => {
+            // Double-check request is still current
+            if (s.pendingRequestId !== requestId) {
+              return s; // No changes if request superseded
+            }
+            
             // Ensure we're working with the latest state
             const nextStatus = { ...s.qualificationStatus, ...updated };
             const baseScore = typeof updated.score === 'number' ? updated.score : nextStatus.score;
@@ -176,6 +220,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       
       // Get fresh state for API call
       const currentState = get();
+      
+      // Check if request is still current before making API call
+      if (currentState.pendingRequestId !== requestId) {
+        return; // Request has been superseded
+      }
 
       // Build context from conversation history (limit to last 10 messages to avoid token limits)
       const recentMessages = currentState.messages.slice(-10).map(m => ({
@@ -183,33 +232,52 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         content: m.content,
       }));
       
-      // Call API with retry logic
+      // Call API (retry logic is now handled in the service)
       let response;
-      let retryCount = 0;
-      const maxRetries = 2;
-
-      while (retryCount <= maxRetries) {
-        try {
-          response = await sendMessage(sanitizedContent, currentState.sessionId, {
-            prospectName: currentState.prospectInfo.name,
-            company: currentState.prospectInfo.company,
-            email: currentState.prospectInfo.email,
-            previousMessages: recentMessages,
-          });
-          break; // Success, exit retry loop
-        } catch (apiError) {
-          retryCount++;
-          if (retryCount > maxRetries) {
-            throw apiError; // Final failure after retries
-          }
-          
-          // Wait before retry (exponential backoff)
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
+      try {
+        response = await sendMessage(sanitizedContent, currentState.sessionId, {
+          prospectName: currentState.prospectInfo.name,
+          company: currentState.prospectInfo.company,
+          email: currentState.prospectInfo.email,
+          previousMessages: recentMessages,
+        });
+      } catch (apiError) {
+        // Check if request is still current before handling error
+        const latestState = get();
+        if (latestState.pendingRequestId !== requestId) {
+          return; // Request superseded, ignore error
         }
+        
+        // For ChatServiceError, provide more specific error messages
+        let errorMessage = 'Failed to send message';
+        if (apiError instanceof ChatServiceError) {
+          switch (apiError.code) {
+            case 'TIMEOUT':
+              errorMessage = 'Request timed out. Please try again.';
+              break;
+            case 'NETWORK_ERROR':
+              errorMessage = 'Network error. Please check your connection.';
+              break;
+            case 'API_ERROR':
+              errorMessage = 'Service temporarily unavailable. Please try again.';
+              break;
+            case 'VALIDATION_ERROR':
+              errorMessage = 'Invalid response from server. Please try again.';
+              break;
+            default:
+              errorMessage = apiError.message;
+          }
+        } else if (apiError instanceof Error) {
+          errorMessage = apiError.message;
+        }
+        
+        throw new Error(errorMessage);
       }
 
-      if (!response) {
-        throw new Error('Failed to get response after retries');
+      // Check if request is still current before updating with response
+      const finalCheckState = get();
+      if (finalCheckState.pendingRequestId !== requestId) {
+        return; // Request superseded, ignore response
       }
       
       // Add AI response with updated state
@@ -221,12 +289,21 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       };
       
       // Atomic state update
-      set(s => ({
-        messages: [...s.messages, aiMessage],
-        isTyping: false,
-        sessionId: response.sessionId,
-        error: null, // Clear any previous errors
-      }));
+      set(s => {
+        // Final check that request is still current
+        if (s.pendingRequestId !== requestId) {
+          return s; // No changes if request superseded
+        }
+        
+        return {
+          ...s,
+          messages: [...s.messages, aiMessage],
+          isTyping: false,
+          sessionId: response.sessionId,
+          error: null, // Clear any previous errors
+          pendingRequestId: null, // Clear pending request
+        };
+      });
 
       // Post-response qualification update
       const finalState = get();
@@ -239,11 +316,20 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     } catch (error) {
       console.error('Failed to send message:', error);
       
-      // Ensure we always clear the typing state and set error
-      set(() => ({
-        isTyping: false,
-        error: error instanceof Error ? error.message : 'Failed to send message',
-      }));
+      // Ensure we always clear the typing state and set error, but only for current request
+      set(s => {
+        // Only update if this is still the current request
+        if (s.pendingRequestId !== requestId) {
+          return s; // No changes if request superseded
+        }
+        
+        return {
+          ...s,
+          isTyping: false,
+          error: error instanceof Error ? error.message : 'Failed to send message',
+          pendingRequestId: null, // Clear pending request
+        };
+      });
       
       // Don't rethrow - let the UI handle the error state
     }
@@ -279,6 +365,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
   
   clearChat: () => {
+    // Clear any pending debounce timeout
+    if (debounceTimeout) {
+      clearTimeout(debounceTimeout);
+      debounceTimeout = null;
+    }
+    
     // Reset Slack notification state for new session
     resetNotificationState();
     
@@ -303,10 +395,23 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         demoPricing: false,
       },
       error: null,
+      isTyping: false, // Ensure typing is reset
+      pendingRequestId: null, // Clear any pending request
+      lastMessageTimestamp: 0,
     });
   },
 
+  clearError: () => {
+    set(s => ({ ...s, error: null }));
+  },
+
   loadDemoScenario: async () => {
+    // Clear any pending debounce timeout
+    if (debounceTimeout) {
+      clearTimeout(debounceTimeout);
+      debounceTimeout = null;
+    }
+    
     // Load the hot lead demo conversation (TechFlow Solutions)
     const hotLeadMessages = [
       {
@@ -369,6 +474,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         demoPricing: true,
       },
       error: null,
+      pendingRequestId: null,
+      lastMessageTimestamp: 0,
     });
   },
 }));

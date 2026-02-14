@@ -4,6 +4,22 @@
 
 import { useSettingsStore } from '../store/settingsStore';
 
+export class ChatServiceError extends Error {
+  public readonly code: 'NETWORK_ERROR' | 'TIMEOUT' | 'PARSE_ERROR' | 'VALIDATION_ERROR' | 'API_ERROR' | 'UNKNOWN';
+  public readonly originalError?: Error;
+
+  constructor(
+    message: string,
+    code: 'NETWORK_ERROR' | 'TIMEOUT' | 'PARSE_ERROR' | 'VALIDATION_ERROR' | 'API_ERROR' | 'UNKNOWN',
+    originalError?: Error
+  ) {
+    super(message);
+    this.name = 'ChatServiceError';
+    this.code = code;
+    this.originalError = originalError;
+  }
+}
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 interface ChatContext {
@@ -23,8 +39,11 @@ interface ChatResponse {
 export async function sendMessage(
   message: string,
   sessionId: string | null,
-  context: ChatContext
+  context: ChatContext,
+  retryCount = 0
 ): Promise<ChatResponse> {
+  const maxRetries = 1;
+  
   try {
     const { aiModel, aiApiKey } = useSettingsStore.getState();
 
@@ -55,10 +74,17 @@ export async function sendMessage(
       // Handle network errors, timeouts, and CORS issues
       if (fetchError instanceof Error) {
         if (fetchError.name === 'AbortError') {
-          throw new Error('Request timeout - please try again');
+          throw new ChatServiceError('Request timeout - please try again', 'TIMEOUT', fetchError);
         }
         if (fetchError.message.includes('Failed to fetch') || fetchError.message.includes('NetworkError')) {
-          // Fallback to demo mode for network issues
+          // For network errors, attempt retry before falling back
+          if (retryCount < maxRetries) {
+            await sleep(Math.pow(2, retryCount + 1) * 1000); // Exponential backoff
+            return sendMessage(message, sessionId, context, retryCount + 1);
+          }
+          
+          // Final fallback to demo mode for persistent network issues
+          console.warn('Network error, falling back to demo mode:', fetchError.message);
           return {
             success: true,
             response: getDemoResponse(message),
@@ -66,7 +92,11 @@ export async function sendMessage(
           };
         }
       }
-      throw new Error(`Network error: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`);
+      throw new ChatServiceError(
+        `Network error: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`,
+        'NETWORK_ERROR',
+        fetchError instanceof Error ? fetchError : undefined
+      );
     }
     
     clearTimeout(timeoutId);
@@ -76,23 +106,34 @@ export async function sendMessage(
     try {
       const responseText = await response.text();
       if (!responseText.trim()) {
-        throw new Error('Empty response from server');
+        throw new ChatServiceError('Empty response from server', 'PARSE_ERROR');
       }
       data = JSON.parse(responseText);
     } catch (parseError) {
       console.error('JSON parse error:', parseError);
-      throw new Error('Invalid response format from chat service');
+      throw new ChatServiceError(
+        'Invalid response format from chat service', 
+        'PARSE_ERROR', 
+        parseError instanceof Error ? parseError : undefined
+      );
     }
 
     if (!response.ok) {
       const errorMessage = (data as { error?: string }).error || `HTTP ${response.status}: ${response.statusText}`;
-      throw new Error(errorMessage);
+      
+      // Retry for transient server errors (500s)
+      if (response.status >= 500 && retryCount < maxRetries) {
+        await sleep(Math.pow(2, retryCount + 1) * 1000); // Exponential backoff
+        return sendMessage(message, sessionId, context, retryCount + 1);
+      }
+      
+      throw new ChatServiceError(errorMessage, 'API_ERROR');
     }
 
     // Validate response structure
     const chatResponse = data as ChatResponse;
     if (!chatResponse.response || typeof chatResponse.response !== 'string') {
-      throw new Error('Invalid response structure from chat service');
+      throw new ChatServiceError('Invalid response structure from chat service', 'VALIDATION_ERROR');
     }
 
     return {
@@ -104,25 +145,23 @@ export async function sendMessage(
   } catch (error) {
     console.error('Chat service error:', error);
     
-    // For any error, provide fallback behavior
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    
-    // Don't fallback to demo for validation/parsing errors - those indicate real issues
-    if (errorMessage.includes('Invalid response') || errorMessage.includes('timeout')) {
+    // If it's already a ChatServiceError, just rethrow
+    if (error instanceof ChatServiceError) {
       throw error;
     }
     
-    // Fallback to demo mode for network/fetch errors
-    if (errorMessage.includes('Network') || errorMessage.includes('Failed to fetch')) {
-      return {
-        success: true,
-        response: getDemoResponse(message),
-        sessionId: sessionId || `demo_${Date.now()}`,
-      };
-    }
-    
-    throw error;
+    // For any other error, wrap it
+    throw new ChatServiceError(
+      error instanceof Error ? error.message : 'Unknown error occurred',
+      'UNKNOWN',
+      error instanceof Error ? error : undefined
+    );
   }
+}
+
+// Utility function for delays
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // Demo fallback responses when API is not available
