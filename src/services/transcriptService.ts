@@ -164,13 +164,13 @@ export class TranscriptService {
         return this.isSessionStorageAvailable ? [] : this.inMemoryTranscripts;
       }
       
-      const transcripts = stored;
-      return transcripts.map((t: any) => ({
+      const transcripts = stored as StoredConversation[];
+      return transcripts.map((t: StoredConversation) => ({
         ...t,
         createdAt: new Date(t.createdAt),
         updatedAt: new Date(t.updatedAt),
         lastActivity: new Date(t.lastActivity),
-        messages: t.messages.map((m: any) => ({
+        messages: t.messages.map((m) => ({
           ...m,
           timestamp: new Date(m.timestamp)
         }))
@@ -266,8 +266,8 @@ export class TranscriptService {
         return this.isSessionStorageAvailable ? [] : this.inMemorySummaries;
       }
       
-      const summaries = stored;
-      return summaries.map((s: any) => ({
+      const summaries = stored as TranscriptSummary[];
+      return summaries.map((s: TranscriptSummary) => ({
         ...s,
         generatedAt: new Date(s.generatedAt),
       }));

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   CheckCircle,
   Upload,
@@ -16,13 +16,12 @@ import {
   Building
 } from 'lucide-react';
 import { demoService } from '../../demo/demoService';
-import { getSessionItem } from '../../utils/sessionStorage';
 
 interface OnboardingStep {
   id: string;
   title: string;
   description: string;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<{ className?: string }>;
   completed: boolean;
   optional?: boolean;
 }
@@ -42,14 +41,14 @@ interface OnboardingConfig {
   qualification: {
     schema: 'bant' | 'custom';
     scoreThreshold: number;
-    customCriteria: any[];
+    customCriteria: unknown[];
   };
   knowledgeBase: {
     uploadedFiles: number;
     trainedOnContent: boolean;
   };
   salesTeam: {
-    members: any[];
+    members: Array<{ name: string; role: string }>;
     calendarsConnected: number;
   };
   integrations: {
@@ -65,97 +64,51 @@ interface OnboardingConfig {
 
 const OnboardingWizard: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(0);
-  const [config, setConfig] = useState<OnboardingConfig>({
-    company: {
-      name: 'Acme Corp',
-      industry: 'Technology',
-      size: '50-200 employees',
-      website: 'https://acme.com'
-    },
-    branding: {
-      logoUrl: '',
-      primaryColor: '#3b82f6',
-      secondaryColor: '#64748b'
-    },
-    qualification: {
-      schema: 'bant',
-      scoreThreshold: 75,
-      customCriteria: []
-    },
-    knowledgeBase: {
-      uploadedFiles: 0,
-      trainedOnContent: false
-    },
-    salesTeam: {
-      members: [],
-      calendarsConnected: 0
-    },
-    integrations: {
-      crm: '',
-      slack: false,
-      calendar: false
-    },
-    domain: {
-      customDomain: '',
-      configured: false
-    }
+  const [config, setConfig] = useState<OnboardingConfig>(() => {
+    const isDemo = demoService.isDemoActive();
+    return {
+      company: {
+        name: isDemo ? 'TechFlow Solutions' : 'Acme Corp',
+        industry: isDemo ? 'Software Development' : 'Technology',
+        size: isDemo ? '100-500 employees' : '50-200 employees',
+        website: isDemo ? 'https://techflowsolutions.com' : 'https://acme.com'
+      },
+      branding: {
+        logoUrl: '',
+        primaryColor: isDemo ? '#2563eb' : '#3b82f6',
+        secondaryColor: isDemo ? '#64748b' : '#64748b'
+      },
+      qualification: {
+        schema: 'bant',
+        scoreThreshold: 75,
+        customCriteria: []
+      },
+      knowledgeBase: {
+        uploadedFiles: isDemo ? 4 : 0,
+        trainedOnContent: isDemo
+      },
+      salesTeam: {
+        members: isDemo ? [
+          { name: 'John Sales', role: 'Senior Sales Executive' },
+          { name: 'Sarah Account Manager', role: 'Account Manager' }
+        ] : [],
+        calendarsConnected: isDemo ? 2 : 0
+      },
+      integrations: {
+        crm: isDemo ? 'salesforce' : '',
+        slack: isDemo,
+        calendar: isDemo
+      },
+      domain: {
+        customDomain: isDemo ? 'sales.techflow.com' : '',
+        configured: false
+      }
+    };
   });
   
-  const [isDemo, setIsDemo] = useState(false);
+  const [isDemo] = useState(() => demoService.isDemoActive());
 
-  useEffect(() => {
-    // Check if we're in demo mode
-    setIsDemo(demoService.isDemoActive());
-    
-    // Load demo onboarding data if available
-    if (demoService.isDemoActive()) {
-      const demoOnboarding = getSessionItem('demo_onboarding');
-      if (demoOnboarding) {
-        const demoData = JSON.parse(demoOnboarding);
-        // Pre-populate with demo data
-        setConfig({
-          ...config,
-          company: {
-            name: 'TechFlow Solutions',
-            industry: 'Software Development',
-            size: '250-500 employees',
-            website: 'https://techflow.com'
-          },
-          branding: {
-            logoUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=200&h=60&fit=crop',
-            primaryColor: '#2563eb',
-            secondaryColor: '#64748b'
-          },
-          qualification: {
-            schema: 'bant',
-            scoreThreshold: 75,
-            customCriteria: []
-          },
-          knowledgeBase: {
-            uploadedFiles: 12,
-            trainedOnContent: true
-          },
-          salesTeam: {
-            members: [
-              { name: 'Alex Thompson', role: 'Senior Sales Executive' },
-              { name: 'Maria Garcia', role: 'Solutions Engineer' },
-              { name: 'David Kim', role: 'Account Executive' }
-            ],
-            calendarsConnected: 3
-          },
-          integrations: {
-            crm: 'salesforce',
-            slack: true,
-            calendar: true
-          },
-          domain: {
-            customDomain: 'sales.techflow.com',
-            configured: false
-          }
-        });
-      }
-    }
-  }, []);
+  // Demo initialization handled in useState above
 
   const steps: OnboardingStep[] = [
     {
@@ -419,7 +372,7 @@ const OnboardingWizard: React.FC = () => {
                     name="schema"
                     value="bant"
                     checked={config.qualification.schema === 'bant'}
-                    onChange={(e) => setConfig({
+                    onChange={() => setConfig({
                       ...config,
                       qualification: { ...config.qualification, schema: 'bant' as const }
                     })}
@@ -437,7 +390,7 @@ const OnboardingWizard: React.FC = () => {
                     name="schema"
                     value="custom"
                     checked={config.qualification.schema === 'custom'}
-                    onChange={(e) => setConfig({
+                    onChange={() => setConfig({
                       ...config,
                       qualification: { ...config.qualification, schema: 'custom' as const }
                     })}

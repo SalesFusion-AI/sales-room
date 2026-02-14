@@ -2,22 +2,17 @@ import React, { useState, useEffect } from 'react';
 import {
   Search,
   Filter,
-  Calendar,
-  User,
   TrendingUp,
   Clock,
   MessageSquare,
   ExternalLink,
   Eye,
-  Download,
   RefreshCw,
   ChevronDown,
   ChevronUp,
   Star,
-  Tag,
   Building,
   Mail,
-  Phone
 } from 'lucide-react';
 import { transcriptService, type StoredConversation, type LeadTag } from '../../services/transcriptService';
 import { crmService } from '../../services/crmService';

@@ -78,7 +78,7 @@ export interface QualificationSchema {
   criteria: QualificationCriterion[];
   scoreThreshold: number; // Minimum score (0-100) to be "ready to connect"
   customFields?: {
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -257,7 +257,7 @@ export interface SlackNotification {
     summary: string;
     keyPoints: string[];
     painPoints: string[];
-    qualificationDetails: Record<string, any>;
+    qualificationDetails: Record<string, unknown>;
   };
   urgency: 'low' | 'medium' | 'high';
   sessionUrl?: string;
@@ -291,7 +291,7 @@ export interface AnalyticsEvent {
   type: 'message_sent' | 'objection_raised' | 'qualification_updated' | 'connect_requested' | 'company_enriched';
   sessionId: string;
   timestamp: Date;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
 }
 
 export interface SalesRoomConfig {
