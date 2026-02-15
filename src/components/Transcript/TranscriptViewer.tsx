@@ -1,17 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Clock, 
   User, 
   Bot, 
   Search, 
-  Filter, 
   Download, 
   Share, 
-  Star,
   MessageSquare,
   Calendar,
   Phone,
-  ExternalLink,
   ChevronDown,
   ChevronRight,
   Sparkles,
@@ -41,7 +38,6 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
   const [conversation, setConversation] = useState<StoredConversation | null>(providedConversation || null);
   const [summary, setSummary] = useState<TranscriptSummary | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [highlightedMessages, setHighlightedMessages] = useState<Set<string>>(new Set());
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['messages', 'summary']));
   const [loading, setLoading] = useState(false);
 
@@ -50,6 +46,7 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
     if (sessionId && !providedConversation) {
       const storedConversation = transcriptService.getConversationBySessionId(sessionId);
       if (storedConversation) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setConversation(storedConversation);
         
         // Load or generate summary
@@ -74,11 +71,10 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
     }
   }, [sessionId, providedConversation]);
 
-  // Handle search
-  useEffect(() => {
+  // Compute highlighted messages from search term
+  const highlightedMessages = useMemo(() => {
     if (!searchTerm || !conversation) {
-      setHighlightedMessages(new Set());
-      return;
+      return new Set<string>();
     }
 
     const highlighted = new Set<string>();
@@ -90,7 +86,7 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
       }
     });
     
-    setHighlightedMessages(highlighted);
+    return highlighted;
   }, [searchTerm, conversation]);
 
   const toggleSection = (sectionId: string) => {
@@ -429,7 +425,7 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {conversation.messages.map((message, index) => (
+            {conversation.messages.map((message) => (
               <div
                 key={message.id}
                 className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} ${

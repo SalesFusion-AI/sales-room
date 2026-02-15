@@ -23,13 +23,42 @@ interface MetricCard {
   value: string | number;
   change?: number;
   changeLabel?: string;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<Record<string, unknown>>;
   color: string;
   description: string;
 }
 
+interface AnalyticsData {
+  totalConversations?: number;
+  conversationsStarted?: number;
+  hotLeads?: number;
+  warmLeads?: number;
+  coldLeads?: number;
+  qualificationRate?: number;
+  callsBooked?: number;
+  averageQualificationScore?: number;
+  avgQualificationScore?: number;
+  conversionRate?: number;
+  averageSessionDuration?: number;
+  averageMessagesPerSession?: number;
+  avgMessageCount?: number;
+  crmSyncedCount?: number;
+  weeklyTrends?: Array<{
+    week: string;
+    conversations: number;
+    qualified: number;
+    connected: number;
+    booked?: number;
+  }>;
+  topIndustries?: Array<{
+    name: string;
+    percentage: number;
+    count?: number;
+  }>;
+}
+
 const AnalyticsDashboard: React.FC = () => {
-  const [analytics, setAnalytics] = useState<any>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
 
@@ -103,7 +132,7 @@ const AnalyticsDashboard: React.FC = () => {
     },
     {
       title: 'Qualification Rate', 
-      value: `${analytics.qualificationRate || (analytics.totalConversations > 0 ? Math.round((analytics.hotLeads + analytics.warmLeads) / analytics.totalConversations * 100) : 0)}%`,
+      value: `${analytics.qualificationRate || ((analytics.totalConversations || 0) > 0 ? Math.round(((analytics.hotLeads || 0) + (analytics.warmLeads || 0)) / (analytics.totalConversations || 1) * 100) : 0)}%`,
       change: +12,
       changeLabel: 'vs last month',
       icon: Target,
@@ -308,7 +337,7 @@ const AnalyticsDashboard: React.FC = () => {
           
           {analytics.weeklyTrends && (
             <div className="space-y-4">
-              {analytics.weeklyTrends.map((week: any, index: number) => (
+              {analytics.weeklyTrends.map((week, index: number) => (
                 <div key={index} className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-medium text-gray-700">{week.week}</span>
@@ -346,7 +375,7 @@ const AnalyticsDashboard: React.FC = () => {
                       <div className="flex-1 bg-gray-200 rounded-full h-2">
                         <div
                           className="h-2 bg-purple-500 rounded-full transition-all duration-500"
-                          style={{ width: `${week.qualified > 0 ? (week.booked / week.qualified) * 100 : 0}%` }}
+                          style={{ width: `${week.qualified > 0 ? ((week.booked || 0) / week.qualified) * 100 : 0}%` }}
                         ></div>
                       </div>
                       <div className="w-8 text-xs text-gray-700">{week.booked}</div>
@@ -370,7 +399,7 @@ const AnalyticsDashboard: React.FC = () => {
           
           {analytics.topIndustries && (
             <div className="space-y-3">
-              {analytics.topIndustries.map((industry: any, index: number) => (
+              {analytics.topIndustries.map((industry, index: number) => (
                 <div key={index} className="space-y-1">
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-medium text-gray-700">{industry.name}</span>

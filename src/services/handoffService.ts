@@ -50,9 +50,9 @@ export class HandoffService {
 
     // Check multiple availability sources
     const availabilityChecks = await Promise.all([
-      this.checkCalendarAvailability(rep),
+      this.checkCalendarAvailability(),
       this.checkSlackStatus(rep),
-      this.checkManualStatus(rep)
+      this.checkManualStatus()
     ]);
 
     // Combine availability from all sources (most restrictive wins)
@@ -85,7 +85,7 @@ export class HandoffService {
   }
 
   // Check calendar availability (Google Calendar, Outlook, etc.)
-  private async checkCalendarAvailability(rep: SalesRep): Promise<AvailabilityStatus> {
+  private async checkCalendarAvailability(): Promise<AvailabilityStatus> {
     // This would integrate with calendar APIs
     // For now, implementing a mock that can be replaced with real API calls
     
@@ -95,7 +95,7 @@ export class HandoffService {
       // - Microsoft Graph API
       // - CalDAV endpoints
       
-      const response = await this.mockCalendarAPI(rep.email);
+      const response = await this.mockCalendarAPI();
       
       if (response.busy) {
         return {
@@ -123,7 +123,7 @@ export class HandoffService {
   }
 
   // Mock calendar API - replace with real implementation
-  private async mockCalendarAPI(_email: string): Promise<{
+  private async mockCalendarAPI(): Promise<{
     busy: boolean;
     nextFree?: Date;
     currentEvent?: { title: string; endTime: string };
@@ -163,7 +163,7 @@ export class HandoffService {
 
     try {
       // This would call Slack API to get user presence
-      const slackStatus = await this.mockSlackAPI(rep.slackUserId);
+      const slackStatus = await this.mockSlackAPI();
       
       return {
         status: slackStatus.presence === 'away' ? 'offline' : 
@@ -181,7 +181,7 @@ export class HandoffService {
   }
 
   // Mock Slack API - replace with real Slack Web API calls
-  private async mockSlackAPI(userId: string): Promise<{
+  private async mockSlackAPI(): Promise<{
     presence: 'active' | 'away';
     dnd: boolean;
     dndUntil?: string;
@@ -200,7 +200,7 @@ export class HandoffService {
   }
 
   // Check manual status override
-  private async checkManualStatus(rep: SalesRep): Promise<AvailabilityStatus> {
+  private async checkManualStatus(): Promise<AvailabilityStatus> {
     // This could check a database/cache for manual status overrides
     // For now, return available (manual overrides would be implemented separately)
     return {
