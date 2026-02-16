@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, memo, useCallback, useMemo } from 'react';
 import { X, CheckCircle2, AlertCircle, Play } from 'lucide-react';
-import { useSettingsStore } from '../../store/settingsStore';
-import { useChatStore } from '../../store/chatStore';
+import { useAiModel, useAiApiKey, useSettingsActions } from '../../store/settingsStore';
+import { useChatActions } from '../../store/chatStore';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -18,8 +18,10 @@ interface SettingsPanelProps {
 }
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
-  const { aiModel, aiApiKey, setAiModel, setApiKey } = useSettingsStore();
-  const { loadDemoScenario } = useChatStore();
+  const aiModel = useAiModel();
+  const aiApiKey = useAiApiKey();
+  const { setAiModel, setApiKey } = useSettingsActions();
+  const { loadDemoScenario } = useChatActions();
   const [draftModel, setDraftModel] = useState(aiModel);
   const [draftKey, setDraftKey] = useState(aiApiKey);
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -34,13 +36,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
     }
   }, [isOpen, aiModel, aiApiKey]);
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     setAiModel(draftModel);
     setApiKey(draftKey);
     setStatus({ type: 'success', message: 'Settings saved to your browser.' });
-  };
+  }, [draftModel, draftKey, setAiModel, setApiKey]);
 
-  const handleTestConnection = async () => {
+  const handleTestConnection = useCallback(async () => {
     setIsTesting(true);
     setStatus(null);
 
@@ -71,9 +73,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
     } finally {
       setIsTesting(false);
     }
-  };
+  }, [draftModel, draftKey]);
 
-  const handleLoadDemo = async () => {
+  const handleLoadDemo = useCallback(async () => {
     setIsLoadingDemo(true);
     setStatus(null);
 
@@ -95,7 +97,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
     } finally {
       setIsLoadingDemo(false);
     }
-  };
+  }, [loadDemoScenario, onClose]);
+
+  // Memoize model options to prevent recreation
+  const modelOptions = useMemo(() => MODEL_OPTIONS, []);
 
   if (!isOpen) {
     return null;
@@ -133,7 +138,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
               onChange={(event) => setDraftModel(event.target.value)}
               className="w-full rounded-xl border border-[#222] bg-[#111] px-4 py-3 text-sm text-gray-100 focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-white/10"
             >
-              {MODEL_OPTIONS.map((option) => (
+              {modelOptions.map((option) => (
                 <option key={option} value={option} className="bg-[#111]">
                   {option}
                 </option>
@@ -198,4 +203,4 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
   );
 };
 
-export default SettingsPanel;
+export default memo(SettingsPanel);

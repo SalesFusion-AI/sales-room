@@ -57,3 +57,13 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
     setStoredValue(BOOKING_URL_KEY, url);
   },
 }));
+
+// Optimized selectors for settings store
+export const useAiModel = () => useSettingsStore(s => s.aiModel);
+export const useAiApiKey = () => useSettingsStore(s => s.aiApiKey);
+export const useBookingUrl = () => useSettingsStore(s => s.bookingUrl);
+export const useSettingsActions = () => useSettingsStore(s => ({
+  setAiModel: s.setAiModel,
+  setApiKey: s.setApiKey,
+  setBookingUrl: s.setBookingUrl,
+}));

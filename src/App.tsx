@@ -1,15 +1,70 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, memo, lazy, Suspense } from 'react';
 import { Send, MessageSquare, User, AlertCircle } from 'lucide-react';
-import { useChatStore, useMessages, useIsTyping, useProspectInfo, useError } from './store/chatStore';
+import { useMessages, useIsTyping, useProspectInfo, useError, useChatActions } from './store/chatStore';
 import { validateMessage } from './utils/validation';
+import { debounce } from './utils/performance';
 import TalkToSalesButton from './components/TalkToSales/TalkToSalesButton';
 import SettingsButton from './components/Settings/SettingsButton';
-import SettingsPanel from './components/Settings/SettingsPanel';
 import './App.css';
+
+// Lazy load settings panel for better initial load performance
+const SettingsPanel = lazy(() => import('./components/Settings/SettingsPanel'));
+
+// Define message interface
+interface Message {
+  id: string;
+  content: string;
+  role: 'user' | 'assistant';
+  timestamp: Date;
+}
+
+// Memoized message component to prevent unnecessary re-renders
+const ChatMessage = memo(({ message }: { message: Message }) => (
+  <div className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+    <div
+      className={`max-w-[85%] sm:max-w-sm md:max-w-md px-4 sm:px-5 py-3.5 sm:py-4 rounded-2xl sm:rounded-3xl shadow-lg ${
+        message.role === 'user'
+          ? 'bg-[#111] text-white border border-[#222] shadow-[0_12px_30px_rgba(0,0,0,0.6)]'
+          : 'bg-[#0b0b0b]/80 text-white border border-[#222] backdrop-blur-[26px] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]'
+      }`}
+    >
+      <p className="text-sm sm:text-base leading-relaxed whitespace-pre-wrap">{message.content}</p>
+      <p className="text-xs mt-2 text-[var(--text-secondary)]">
+        {message.timestamp.toLocaleTimeString()}
+      </p>
+    </div>
+  </div>
+));
+ChatMessage.displayName = 'ChatMessage';
+
+// Memoized typing indicator
+const TypingIndicator = memo(() => (
+  <div className="flex justify-start">
+    <div className="bg-[#111]/70 border border-[#222] rounded-2xl sm:rounded-3xl px-4 sm:px-5 py-3.5 sm:py-4 shadow-lg backdrop-blur-[24px]">
+      <div className="flex space-x-1">
+        <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce"></div>
+        <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+        <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+      </div>
+    </div>
+  </div>
+));
+TypingIndicator.displayName = 'TypingIndicator';
+
+// Memoized prospect info indicator
+const ProspectIndicator = memo(({ name }: { name: string }) => (
+  <div className="flex items-center text-xs sm:text-sm">
+    <div className="flex items-center text-[var(--text-secondary)] bg-[#111]/70 border border-[#222] px-3 py-2 rounded-full backdrop-blur-md">
+      <User className="h-4 w-4 mr-2" />
+      <span className="truncate max-w-[180px] sm:max-w-none">{name}</span>
+    </div>
+  </div>
+));
+ProspectIndicator.displayName = 'ProspectIndicator';
 
 function App() {
   // Use optimized selectors to prevent unnecessary re-renders
-  const sendUserMessage = useChatStore(useCallback(s => s.sendUserMessage, []));
+  const { sendUserMessage } = useChatActions();
   const messages = useMessages();
   const isTyping = useIsTyping();
   const prospectInfo = useProspectInfo();
@@ -19,29 +74,48 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom with performance optimization
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Use requestAnimationFrame to ensure smooth scrolling
+    const scrollToBottom = () => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
+    };
+    
+    requestAnimationFrame(scrollToBottom);
   }, [messages, isTyping]);
+
+  // Debounced validation to prevent excessive calls
+  const debouncedValidation = useMemo(
+    () => debounce((value: string) => {
+      if (value.trim()) {
+        const validation = validateMessage(value, { maxLength: 500, minLength: 1 });
+        if (!validation.isValid) {
+          setInputError(validation.error || null);
+        } else {
+          setInputError(null);
+        }
+      } else {
+        setInputError(null);
+      }
+    }, 300),
+    []
+  );
 
   // Validate input as user types
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setInputMessage(value);
     
-    // Clear previous error
+    // Clear previous error immediately for better UX
     if (inputError) {
       setInputError(null);
     }
     
-    // Validate if there's content
-    if (value.trim()) {
-      const validation = validateMessage(value, { maxLength: 500, minLength: 1 });
-      if (!validation.isValid) {
-        setInputError(validation.error || null);
-      }
-    }
-  }, [inputError]);
+    // Debounced validation
+    debouncedValidation(value);
+  }, [inputError, debouncedValidation]);
 
   // Memoize handlers to prevent unnecessary re-renders of child components
   const handleSendMessage = useCallback(async () => {
@@ -108,14 +182,7 @@ function App() {
             
             <div className="flex items-center gap-3">
               {/* Prospect info indicator */}
-              {prospectInfo.name && (
-                <div className="flex items-center text-xs sm:text-sm">
-                  <div className="flex items-center text-[var(--text-secondary)] bg-[#111]/70 border border-[#222] px-3 py-2 rounded-full backdrop-blur-md">
-                    <User className="h-4 w-4 mr-2" />
-                    <span className="truncate max-w-[180px] sm:max-w-none">{prospectInfo.name}</span>
-                  </div>
-                </div>
-              )}
+              {prospectInfo.name && <ProspectIndicator name={prospectInfo.name} />}
               <SettingsButton onClick={() => setIsSettingsOpen(true)} />
             </div>
           </div>
@@ -139,37 +206,11 @@ function App() {
           {/* Messages Area */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 scroll-smooth pb-28 sm:pb-6 scrollbar-thin">
             {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[85%] sm:max-w-sm md:max-w-md px-4 sm:px-5 py-3.5 sm:py-4 rounded-2xl sm:rounded-3xl shadow-lg ${
-                    message.role === 'user'
-                      ? 'bg-[#111] text-white border border-[#222] shadow-[0_12px_30px_rgba(0,0,0,0.6)]'
-                      : 'bg-[#0b0b0b]/80 text-white border border-[#222] backdrop-blur-[26px] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]'
-                  }`}
-                >
-                  <p className="text-sm sm:text-base leading-relaxed whitespace-pre-wrap">{message.content}</p>
-                  <p className="text-xs mt-2 text-[var(--text-secondary)]">
-                    {message.timestamp.toLocaleTimeString()}
-                  </p>
-                </div>
-              </div>
+              <ChatMessage key={message.id} message={message} />
             ))}
 
             {/* Typing indicator */}
-            {isTyping && (
-              <div className="flex justify-start">
-                <div className="bg-[#111]/70 border border-[#222] rounded-2xl sm:rounded-3xl px-4 sm:px-5 py-3.5 sm:py-4 shadow-lg backdrop-blur-[24px]">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                  </div>
-                </div>
-              </div>
-            )}
+            {isTyping && <TypingIndicator />}
             <div ref={messagesEndRef} />
           </div>
 
@@ -222,10 +263,12 @@ function App() {
         </div>
       </div>
 
-      <SettingsPanel
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-      />
+      <Suspense fallback={null}>
+        <SettingsPanel
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+        />
+      </Suspense>
       
       {/* Talk to Sales floating button - appears when qualification score > 75 */}
       <TalkToSalesButton />
@@ -233,4 +276,4 @@ function App() {
   );
 }
 
-export default App;
+export default memo(App);

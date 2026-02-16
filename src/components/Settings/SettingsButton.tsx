@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Settings } from 'lucide-react';
 
 interface SettingsButtonProps {
@@ -19,4 +19,4 @@ const SettingsButton: React.FC<SettingsButtonProps> = ({ onClick, className }) =
   );
 };
 
-export default SettingsButton;
+export default memo(SettingsButton);

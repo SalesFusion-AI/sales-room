@@ -20,109 +20,198 @@ interface ChatResponse {
   error?: string;
 }
 
+// Exponential backoff utility
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Request cache for duplicate prevention
+const requestCache = new Map<string, Promise<ChatResponse>>();
+const CACHE_TTL = 5000; // 5 seconds
+
 export async function sendMessage(
   message: string,
   sessionId: string | null,
   context: ChatContext
 ): Promise<ChatResponse> {
-  try {
-    const { aiModel, aiApiKey } = useSettingsStore.getState();
-
-    // Create AbortController for timeout handling
-    const abortController = new AbortController();
-    const timeoutId = setTimeout(() => abortController.abort(), 30000); // 30 second timeout
-
-    let response: Response;
-    
-    try {
-      response = await fetch(`${API_URL}/api/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message,
-          sessionId,
-          context,
-          model: aiModel,
-          apiKey: aiApiKey,
-        }),
-        signal: abortController.signal,
-      });
-    } catch (fetchError) {
-      clearTimeout(timeoutId);
-      
-      // Handle network errors, timeouts, and CORS issues
-      if (fetchError instanceof Error) {
-        if (fetchError.name === 'AbortError') {
-          throw new Error('Request timeout - please try again');
-        }
-        if (fetchError.message.includes('Failed to fetch') || fetchError.message.includes('NetworkError')) {
-          // Fallback to demo mode for network issues
-          return {
-            success: true,
-            response: getDemoResponse(message),
-            sessionId: sessionId || `demo_${Date.now()}`,
-          };
-        }
-      }
-      throw new Error(`Network error: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`);
-    }
-    
-    clearTimeout(timeoutId);
-
-    let data: ChatResponse | { error?: string };
-
-    try {
-      const responseText = await response.text();
-      if (!responseText.trim()) {
-        throw new Error('Empty response from server');
-      }
-      data = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error('JSON parse error:', parseError);
-      throw new Error('Invalid response format from chat service');
-    }
-
-    if (!response.ok) {
-      const errorMessage = (data as { error?: string }).error || `HTTP ${response.status}: ${response.statusText}`;
-      throw new Error(errorMessage);
-    }
-
-    // Validate response structure
-    const chatResponse = data as ChatResponse;
-    if (!chatResponse.response || typeof chatResponse.response !== 'string') {
-      throw new Error('Invalid response structure from chat service');
-    }
-
-    return {
-      success: chatResponse.success ?? true,
-      response: chatResponse.response,
-      sessionId: chatResponse.sessionId || sessionId || `session_${Date.now()}`,
-    };
-    
-  } catch (error) {
-    console.error('Chat service error:', error);
-    
-    // For any error, provide fallback behavior
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    
-    // Don't fallback to demo for validation/parsing errors - those indicate real issues
-    if (errorMessage.includes('Invalid response') || errorMessage.includes('timeout')) {
-      throw error;
-    }
-    
-    // Fallback to demo mode for network/fetch errors
-    if (errorMessage.includes('Network') || errorMessage.includes('Failed to fetch')) {
-      return {
-        success: true,
-        response: getDemoResponse(message),
-        sessionId: sessionId || `demo_${Date.now()}`,
-      };
-    }
-    
-    throw error;
+  // Create cache key to prevent duplicate requests
+  const cacheKey = `${message}_${sessionId}_${JSON.stringify(context)}`;
+  
+  // Return existing promise if request is already in flight
+  if (requestCache.has(cacheKey)) {
+    const cachedPromise = requestCache.get(cacheKey)!;
+    return cachedPromise;
   }
+
+  const requestPromise = sendMessageInternal(message, sessionId, context);
+  
+  // Cache the promise
+  requestCache.set(cacheKey, requestPromise);
+  
+  // Clean up cache after TTL
+  setTimeout(() => {
+    requestCache.delete(cacheKey);
+  }, CACHE_TTL);
+  
+  return requestPromise;
+}
+
+async function sendMessageInternal(
+  message: string,
+  sessionId: string | null,
+  context: ChatContext
+): Promise<ChatResponse> {
+  const maxRetries = 3;
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const { aiModel, aiApiKey } = useSettingsStore.getState();
+
+      // Create AbortController for timeout handling
+      const abortController = new AbortController();
+      const timeoutMs = attempt === 1 ? 15000 : 30000; // Shorter timeout on first attempt
+      const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
+
+      let response: Response;
+      
+      try {
+        response = await fetch(`${API_URL}/api/chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message,
+            sessionId,
+            context,
+            model: aiModel,
+            apiKey: aiApiKey,
+          }),
+          signal: abortController.signal,
+        });
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        
+        // Handle specific error types
+        if (fetchError instanceof Error) {
+          if (fetchError.name === 'AbortError') {
+            lastError = new Error(`Request timeout (attempt ${attempt}/${maxRetries}) - please try again`);
+          } else if (fetchError.message.includes('Failed to fetch') || fetchError.message.includes('NetworkError')) {
+            lastError = new Error(`Network error (attempt ${attempt}/${maxRetries}): ${fetchError.message}`);
+          } else {
+            lastError = new Error(`Request failed (attempt ${attempt}/${maxRetries}): ${fetchError.message}`);
+          }
+        } else {
+          lastError = new Error(`Unknown error (attempt ${attempt}/${maxRetries})`);
+        }
+        
+        // Don't retry on final attempt, throw or fallback
+        if (attempt === maxRetries) {
+          // Fallback to demo mode for network issues only
+          if (lastError.message.includes('Network error') || lastError.message.includes('Failed to fetch')) {
+            return {
+              success: true,
+              response: getDemoResponse(message),
+              sessionId: sessionId || `demo_${Date.now()}`,
+            };
+          }
+          throw lastError;
+        }
+        
+        // Exponential backoff before retry
+        await delay(Math.pow(2, attempt - 1) * 1000);
+        continue;
+      }
+      
+      clearTimeout(timeoutId);
+
+      let data: ChatResponse | { error?: string };
+
+      try {
+        const responseText = await response.text();
+        if (!responseText.trim()) {
+          throw new Error('Empty response from server');
+        }
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error(`JSON parse error on attempt ${attempt}:`, parseError);
+        lastError = new Error(`Invalid response format from chat service (attempt ${attempt}/${maxRetries})`);
+        
+        // Don't retry parse errors on final attempt
+        if (attempt === maxRetries) {
+          throw lastError;
+        }
+        await delay(Math.pow(2, attempt - 1) * 1000);
+        continue;
+      }
+
+      if (!response.ok) {
+        const errorMessage = (data as { error?: string }).error || `HTTP ${response.status}: ${response.statusText}`;
+        lastError = new Error(`API error (attempt ${attempt}/${maxRetries}): ${errorMessage}`);
+        
+        // Don't retry client errors (4xx), only server errors (5xx)
+        if (response.status >= 400 && response.status < 500) {
+          throw lastError;
+        }
+        
+        if (attempt === maxRetries) {
+          throw lastError;
+        }
+        await delay(Math.pow(2, attempt - 1) * 1000);
+        continue;
+      }
+
+      // Validate response structure
+      const chatResponse = data as ChatResponse;
+      if (!chatResponse.response || typeof chatResponse.response !== 'string') {
+        lastError = new Error(`Invalid response structure from chat service (attempt ${attempt}/${maxRetries})`);
+        
+        if (attempt === maxRetries) {
+          throw lastError;
+        }
+        await delay(Math.pow(2, attempt - 1) * 1000);
+        continue;
+      }
+
+      // Success! Return the valid response
+      return {
+        success: chatResponse.success ?? true,
+        response: chatResponse.response,
+        sessionId: chatResponse.sessionId || sessionId || `session_${Date.now()}`,
+      };
+      
+    } catch (error) {
+      // Log error details for debugging
+      console.error(`Chat service error on attempt ${attempt}:`, error);
+      
+      lastError = error instanceof Error ? error : new Error('Unknown error occurred');
+      
+      // Don't retry on final attempt
+      if (attempt === maxRetries) {
+        break;
+      }
+      
+      // Exponential backoff before retry
+      await delay(Math.pow(2, attempt - 1) * 1000);
+    }
+  }
+
+  // All retries exhausted, decide on fallback behavior
+  const errorMessage = lastError?.message || 'Unknown error occurred';
+  
+  // Fallback to demo mode for network/timeout errors only
+  if (errorMessage.includes('Network error') || 
+      errorMessage.includes('timeout') || 
+      errorMessage.includes('Failed to fetch')) {
+    console.warn('Falling back to demo mode due to network issues');
+    return {
+      success: true,
+      response: getDemoResponse(message),
+      sessionId: sessionId || `demo_${Date.now()}`,
+    };
+  }
+  
+  // For other errors (validation, API errors), throw the error
+  throw lastError || new Error('Request failed after all retries');
 }
 
 // Demo fallback responses when API is not available
