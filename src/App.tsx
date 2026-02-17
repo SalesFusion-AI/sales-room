@@ -8,21 +8,31 @@ import SettingsPanel from './components/Settings/SettingsPanel';
 import './App.css';
 
 function App() {
-  // Use optimized selectors to prevent unnecessary re-renders
-  const sendUserMessage = useChatStore(useCallback(s => s.sendUserMessage, []));
+  // Use properly memoized selectors to prevent unnecessary re-renders
+  const sendUserMessage = useChatStore(
+    useCallback((s) => s.sendUserMessage, [])
+  );
+  const isProcessingMessage = useChatStore(
+    useCallback((s) => s.isProcessingMessage, [])
+  );
   const messages = useMessages();
   const isTyping = useIsTyping();
   const prospectInfo = useProspectInfo();
   const error = useError();
+  
   const [inputMessage, setInputMessage] = useState('');
   const [inputError, setInputError] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom - memoized to prevent unnecessary scrolling
+  const lastMessageId = useMemo(() => {
+    return messages.length > 0 ? messages[messages.length - 1].id : null;
+  }, [messages]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isTyping]);
+  }, [lastMessageId, isTyping]);
 
   // Validate input as user types
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,7 +62,11 @@ function App() {
       return;
     }
     
-    if (isTyping) return;
+    // Check both typing and processing states to prevent overlapping requests
+    if (isTyping || isProcessingMessage) {
+      console.warn('Message sending blocked - already processing');
+      return;
+    }
     
     // Final validation before sending
     const validation = validateMessage(trimmedMessage, { maxLength: 500, minLength: 1 });
@@ -61,10 +75,18 @@ function App() {
       return;
     }
     
+    // Clear input immediately for better UX
     setInputMessage('');
     setInputError(null);
-    await sendUserMessage(trimmedMessage);
-  }, [inputMessage, isTyping, sendUserMessage]);
+    
+    try {
+      await sendUserMessage(trimmedMessage);
+    } catch (error) {
+      // Re-populate input on error for user convenience
+      setInputMessage(trimmedMessage);
+      console.error('Failed to send message:', error);
+    }
+  }, [inputMessage, isTyping, isProcessingMessage, sendUserMessage]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -74,12 +96,15 @@ function App() {
   }, [handleSendMessage]);
 
   const handlePromptClick = useCallback((prompt: string) => {
-    if (!isTyping) {
+    if (!isTyping && !isProcessingMessage) {
       setInputMessage('');
       setInputError(null);
-      sendUserMessage(prompt);
+      sendUserMessage(prompt).catch((error) => {
+        console.error('Failed to send prompt:', error);
+        // Don't re-populate input for prompts as they're not user-typed
+      });
     }
-  }, [isTyping, sendUserMessage]);
+  }, [isTyping, isProcessingMessage, sendUserMessage]);
 
   // Memoize suggested prompts to prevent recreation on every render
   const suggestedPrompts = useMemo(() => [
@@ -187,7 +212,7 @@ function App() {
                   className={`w-full min-h-[44px] glass-input px-4 py-3 placeholder:text-[var(--text-secondary)] ${
                     inputError ? 'border-red-500 focus:border-red-500' : ''
                   }`}
-                  disabled={isTyping}
+                  disabled={isTyping || isProcessingMessage}
                 />
                 {inputError && (
                   <p className="text-red-400 text-xs mt-1 px-2">
@@ -197,7 +222,7 @@ function App() {
               </div>
               <button
                 onClick={handleSendMessage}
-                disabled={!inputMessage.trim() || isTyping || !!inputError}
+                disabled={!inputMessage.trim() || isTyping || isProcessingMessage || !!inputError}
                 className="min-h-[44px] min-w-[44px] bg-white text-black hover:bg-[#f5f5f5] disabled:opacity-40 disabled:cursor-not-allowed px-4 sm:px-6 py-3 rounded-2xl transition-all duration-200 flex items-center justify-center shadow-lg hover:shadow-xl"
                 aria-label="Send message"
               >
@@ -211,7 +236,7 @@ function App() {
                 <button
                   key={prompt}
                   onClick={() => handlePromptClick(prompt)}
-                  disabled={isTyping}
+                  disabled={isTyping || isProcessingMessage}
                   className="min-h-[44px] text-xs sm:text-sm bg-[#111]/70 hover:bg-[#1a1a1a] disabled:opacity-50 text-[var(--text-secondary)] hover:text-white px-3 sm:px-4 py-2.5 rounded-2xl border border-[#222] hover:border-white/20 transition-all duration-200 backdrop-blur-[24px]"
                 >
                   {prompt}

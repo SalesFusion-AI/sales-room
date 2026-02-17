@@ -36,6 +36,8 @@ interface ChatStore {
     demoPricing: boolean;
   };
   error: string | null;
+  isProcessingMessage: boolean; // New: prevent concurrent message processing
+  lastMessageId: string | null; // New: track last processed message to prevent race conditions
   
   // Actions
   sendUserMessage: (content: string) => Promise<void>;
@@ -71,23 +73,41 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     demoPricing: false,
   },
   error: null,
+  isProcessingMessage: false,
+  lastMessageId: null,
   
   sendUserMessage: async (content: string) => {
+    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Prevent concurrent message processing
+    const currentState = get();
+    if (currentState.isProcessingMessage) {
+      console.warn('Message already being processed, ignoring duplicate request');
+      return;
+    }
+
     try {
+      // Set processing flag atomically
+      set(s => ({
+        isProcessingMessage: true,
+        error: null,
+      }));
+
       // Validate and sanitize input
       const validation = validateMessage(content, { maxLength: 500, minLength: 1 });
       if (!validation.isValid) {
-        set(() => ({
+        set(s => ({
           error: validation.error || 'Invalid message',
+          isProcessingMessage: false,
         }));
         return;
       }
 
       const sanitizedContent = sanitizeInput(content);
 
-      // Add user message immediately
+      // Add user message immediately with atomic update
       const userMessage: Message = {
-        id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: `user_${messageId}`,
         content: sanitizedContent,
         role: 'user',
         timestamp: new Date(),
@@ -97,6 +117,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       set(s => ({
         messages: [...s.messages, userMessage],
         isTyping: true,
+        lastMessageId: userMessage.id,
         error: null,
       }));
 
@@ -106,13 +127,26 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       const updateQualificationStatus = async (options?: { messageContent?: string; demoMode?: boolean }) => {
         try {
           const currentState = get();
+          
+          // Prevent qualification update race conditions
+          if (currentState.lastMessageId !== userMessage.id) {
+            console.warn('Qualification update skipped - newer message in progress');
+            return;
+          }
+          
           const updated = await qualificationService.assessQualificationFromMessages(
             currentState.messages,
             currentState.qualificationStatus
           );
 
-          // Use functional update to avoid stale state
+          // Use functional update with additional race condition protection
           set(s => {
+            // Double-check we're still processing the same message
+            if (s.lastMessageId !== userMessage.id) {
+              console.warn('Qualification update race condition detected, skipping');
+              return s; // Return unchanged state
+            }
+            
             // Ensure we're working with the latest state
             const nextStatus = { ...s.qualificationStatus, ...updated };
             const baseScore = typeof updated.score === 'number' ? updated.score : nextStatus.score;
@@ -133,7 +167,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               }
             }
 
-            // Send Slack notification on significant score changes
+            // Send Slack notification on significant score changes (with debouncing)
             const config = getQualificationConfig();
             const scoreDelta = nextScore - s.qualificationScore;
             if (scoreDelta >= config.slackNotificationThreshold || nextScore >= config.handoffThreshold) {
@@ -145,7 +179,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               if (nextSignals.nameCompany) criteriaMet.push('Contact Info');
               if (nextSignals.demoPricing) criteriaMet.push('Demo Interest');
 
-              // Fire and forget - don't block on Slack
+              // Fire and forget - don't block on Slack, with error handling
               notifyQualificationChange({
                 prospectName: s.prospectInfo.name,
                 company: s.prospectInfo.company,
@@ -155,7 +189,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                 criteriaMetCount: criteriaMet.length,
                 criteriaMet,
                 sessionId: s.sessionId,
-              }).catch(() => {}); // Ignore Slack errors
+              }).catch((slackError) => {
+                console.warn('Slack notification failed:', slackError);
+                // Could store failed notifications for retry later
+              });
             }
 
             return {
@@ -168,6 +205,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         } catch (qualificationError) {
           console.warn('Failed to update qualification status:', qualificationError);
           // Don't throw here - qualification failure shouldn't break chat
+          // Set error state for qualification failures
+          set(s => ({
+            error: 'Failed to update qualification status. Chat will continue normally.',
+          }));
         }
       };
 
@@ -212,21 +253,37 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         throw new Error('Failed to get response after retries');
       }
       
+      // Ensure we're still processing the correct message before adding AI response
+      const finalCheckState = get();
+      if (finalCheckState.lastMessageId !== userMessage.id) {
+        console.warn('Message processing race condition detected, aborting AI response');
+        set(s => ({ isProcessingMessage: false }));
+        return;
+      }
+      
       // Add AI response with updated state
       const aiMessage: Message = {
-        id: `assistant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: `assistant_${messageId}`,
         content: response.response,
         role: 'assistant',
         timestamp: new Date(),
       };
       
-      // Atomic state update
-      set(s => ({
-        messages: [...s.messages, aiMessage],
-        isTyping: false,
-        sessionId: response.sessionId,
-        error: null, // Clear any previous errors
-      }));
+      // Atomic state update with race condition protection
+      set(s => {
+        if (s.lastMessageId !== userMessage.id) {
+          console.warn('AI response race condition detected, keeping current state');
+          return { isProcessingMessage: false };
+        }
+        
+        return {
+          messages: [...s.messages, aiMessage],
+          isTyping: false,
+          sessionId: response.sessionId,
+          error: null, // Clear any previous errors
+          isProcessingMessage: false,
+        };
+      });
 
       // Post-response qualification update
       const finalState = get();
@@ -239,9 +296,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     } catch (error) {
       console.error('Failed to send message:', error);
       
-      // Ensure we always clear the typing state and set error
+      // Ensure we always clear the typing state and processing flag, set error
       set(() => ({
         isTyping: false,
+        isProcessingMessage: false,
         error: error instanceof Error ? error.message : 'Failed to send message',
       }));
       
@@ -279,6 +337,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
   
   clearChat: () => {
+    // Prevent clearing during message processing
+    const currentState = get();
+    if (currentState.isProcessingMessage) {
+      console.warn('Cannot clear chat while processing message');
+      return;
+    }
+    
     // Reset Slack notification state for new session
     resetNotificationState();
     
@@ -303,6 +368,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         demoPricing: false,
       },
       error: null,
+      isProcessingMessage: false,
+      lastMessageId: null,
     });
   },
 
@@ -369,6 +436,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         demoPricing: true,
       },
       error: null,
+      isProcessingMessage: false,
+      lastMessageId: null,
     });
   },
 }));

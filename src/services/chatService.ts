@@ -20,17 +20,46 @@ interface ChatResponse {
   error?: string;
 }
 
+interface ApiError extends Error {
+  status?: number;
+  code?: string;
+}
+
 export async function sendMessage(
   message: string,
   sessionId: string | null,
   context: ChatContext
 ): Promise<ChatResponse> {
+  // Input validation
+  if (!message || typeof message !== 'string') {
+    throw new ApiError('Message is required and must be a string');
+  }
+
+  if (message.trim().length === 0) {
+    throw new ApiError('Message cannot be empty');
+  }
+
+  if (message.length > 10000) {
+    throw new ApiError('Message is too long (max 10,000 characters)');
+  }
+
   try {
     const { aiModel, aiApiKey } = useSettingsStore.getState();
 
-    // Create AbortController for timeout handling
+    // Validate required settings
+    if (!aiApiKey || aiApiKey.trim().length === 0) {
+      console.warn('No API key configured, falling back to demo mode');
+      return {
+        success: true,
+        response: getDemoResponse(message),
+        sessionId: sessionId || `demo_${Date.now()}`,
+      };
+    }
+
+    // Create AbortController for timeout handling with longer timeout for complex requests
     const abortController = new AbortController();
-    const timeoutId = setTimeout(() => abortController.abort(), 30000); // 30 second timeout
+    const timeoutMs = context.previousMessages?.length && context.previousMessages.length > 10 ? 45000 : 30000;
+    const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
 
     let response: Response;
     
@@ -39,11 +68,18 @@ export async function sendMessage(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify({
-          message,
+          message: message.trim(),
           sessionId,
-          context,
+          context: {
+            ...context,
+            // Ensure context data is clean
+            prospectName: context.prospectName?.trim(),
+            company: context.company?.trim(),
+            email: context.email?.trim(),
+          },
           model: aiModel,
           apiKey: aiApiKey,
         }),
@@ -52,68 +88,168 @@ export async function sendMessage(
     } catch (fetchError) {
       clearTimeout(timeoutId);
       
-      // Handle network errors, timeouts, and CORS issues
+      // Handle different types of network errors with more specificity
       if (fetchError instanceof Error) {
         if (fetchError.name === 'AbortError') {
-          throw new Error('Request timeout - please try again');
+          const apiError = new ApiError('Request timeout - the server took too long to respond. Please try again.');
+          apiError.code = 'TIMEOUT';
+          throw apiError;
         }
-        if (fetchError.message.includes('Failed to fetch') || fetchError.message.includes('NetworkError')) {
-          // Fallback to demo mode for network issues
+        
+        if (fetchError.message.includes('Failed to fetch')) {
+          console.warn('Network connectivity issue, falling back to demo mode');
           return {
             success: true,
             response: getDemoResponse(message),
             sessionId: sessionId || `demo_${Date.now()}`,
           };
         }
+        
+        if (fetchError.message.includes('NetworkError')) {
+          const apiError = new ApiError('Network connection failed. Please check your internet connection.');
+          apiError.code = 'NETWORK_ERROR';
+          throw apiError;
+        }
       }
-      throw new Error(`Network error: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`);
+      
+      const apiError = new ApiError(`Connection error: ${fetchError instanceof Error ? fetchError.message : 'Unknown network error'}`);
+      apiError.code = 'CONNECTION_ERROR';
+      throw apiError;
     }
     
     clearTimeout(timeoutId);
 
-    let data: ChatResponse | { error?: string };
+    // Handle HTTP error responses
+    if (!response.ok) {
+      let errorData: { error?: string; details?: string } = {};
+      
+      try {
+        const errorText = await response.text();
+        if (errorText.trim()) {
+          errorData = JSON.parse(errorText);
+        }
+      } catch {
+        // Ignore JSON parse errors for error responses
+      }
 
+      const apiError = new ApiError(
+        errorData.error || 
+        `Server error (${response.status}): ${response.statusText || 'Unknown error'}`
+      );
+      apiError.status = response.status;
+      
+      // Map specific HTTP status codes to user-friendly messages
+      switch (response.status) {
+        case 400:
+          apiError.message = 'Invalid request. Please check your input and try again.';
+          apiError.code = 'BAD_REQUEST';
+          break;
+        case 401:
+          apiError.message = 'Authentication failed. Please check your API key in settings.';
+          apiError.code = 'UNAUTHORIZED';
+          break;
+        case 403:
+          apiError.message = 'Access denied. Please check your API key permissions.';
+          apiError.code = 'FORBIDDEN';
+          break;
+        case 429:
+          apiError.message = 'Too many requests. Please wait a moment before trying again.';
+          apiError.code = 'RATE_LIMITED';
+          break;
+        case 500:
+        case 502:
+        case 503:
+        case 504:
+          apiError.message = 'The server is temporarily unavailable. Please try again in a few minutes.';
+          apiError.code = 'SERVER_ERROR';
+          break;
+        default:
+          apiError.code = 'HTTP_ERROR';
+      }
+      
+      throw apiError;
+    }
+
+    // Parse and validate response
+    let data: ChatResponse;
     try {
       const responseText = await response.text();
       if (!responseText.trim()) {
-        throw new Error('Empty response from server');
+        throw new ApiError('Server returned empty response');
       }
-      data = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error('JSON parse error:', parseError);
-      throw new Error('Invalid response format from chat service');
+      
+      const parsed = JSON.parse(responseText);
+      
+      // Validate response structure with detailed error messages
+      if (!parsed || typeof parsed !== 'object') {
+        throw new ApiError('Invalid response format: expected object');
+      }
+      
+      if (!parsed.response || typeof parsed.response !== 'string') {
+        throw new ApiError('Invalid response format: missing or invalid response text');
+      }
+      
+      if (parsed.response.trim().length === 0) {
+        throw new ApiError('Server returned empty response text');
+      }
+      
+      data = parsed as ChatResponse;
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      
+      console.error('JSON parse error:', error);
+      const apiError = new ApiError('Invalid response format from server');
+      apiError.code = 'PARSE_ERROR';
+      throw apiError;
     }
 
-    if (!response.ok) {
-      const errorMessage = (data as { error?: string }).error || `HTTP ${response.status}: ${response.statusText}`;
-      throw new Error(errorMessage);
-    }
-
-    // Validate response structure
-    const chatResponse = data as ChatResponse;
-    if (!chatResponse.response || typeof chatResponse.response !== 'string') {
-      throw new Error('Invalid response structure from chat service');
+    // Additional response validation
+    if (data.response.length > 50000) {
+      console.warn('Response is unusually long, truncating for safety');
+      data.response = data.response.substring(0, 50000) + '... [Response truncated for safety]';
     }
 
     return {
-      success: chatResponse.success ?? true,
-      response: chatResponse.response,
-      sessionId: chatResponse.sessionId || sessionId || `session_${Date.now()}`,
+      success: data.success ?? true,
+      response: data.response,
+      sessionId: data.sessionId || sessionId || `session_${Date.now()}`,
     };
     
   } catch (error) {
     console.error('Chat service error:', error);
     
-    // For any error, provide fallback behavior
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    
-    // Don't fallback to demo for validation/parsing errors - those indicate real issues
-    if (errorMessage.includes('Invalid response') || errorMessage.includes('timeout')) {
+    // Handle ApiError instances with specific codes
+    if (error instanceof ApiError) {
+      // Don't fallback to demo for validation/parsing errors or auth issues
+      if (['PARSE_ERROR', 'BAD_REQUEST', 'UNAUTHORIZED', 'FORBIDDEN'].includes(error.code || '')) {
+        throw error;
+      }
+      
+      // Fallback to demo for network/server issues
+      if (['NETWORK_ERROR', 'CONNECTION_ERROR', 'SERVER_ERROR', 'TIMEOUT'].includes(error.code || '')) {
+        console.warn(`${error.code}: falling back to demo mode`);
+        return {
+          success: true,
+          response: getDemoResponse(message),
+          sessionId: sessionId || `demo_${Date.now()}`,
+        };
+      }
+      
       throw error;
     }
     
-    // Fallback to demo mode for network/fetch errors
-    if (errorMessage.includes('Network') || errorMessage.includes('Failed to fetch')) {
+    // Handle generic errors
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    
+    // Create proper ApiError for unknown errors
+    const apiError = new ApiError(errorMessage);
+    apiError.code = 'UNKNOWN_ERROR';
+    
+    // Fallback to demo for certain generic error patterns
+    if (errorMessage.includes('fetch') || errorMessage.includes('network')) {
+      console.warn('Generic network error, falling back to demo mode');
       return {
         success: true,
         response: getDemoResponse(message),
@@ -121,7 +257,7 @@ export async function sendMessage(
       };
     }
     
-    throw error;
+    throw apiError;
   }
 }
 
@@ -164,4 +300,12 @@ function getDemoResponse(message: string): string {
   return "Thanks for the context. To make sure we're a good fit, can I ask a couple quick questions about your lead volume and timeline?";
 }
 
+// Create a custom error class for better error handling
+function ApiError(message: string): ApiError {
+  const error = new Error(message) as ApiError;
+  error.name = 'ApiError';
+  return error;
+}
+
+export { ApiError };
 export default { sendMessage };
