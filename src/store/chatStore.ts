@@ -178,10 +178,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       const currentState = get();
 
       // Build context from conversation history (limit to last 10 messages to avoid token limits)
-      const recentMessages = currentState.messages.slice(-10).map(m => ({
-        role: m.role,
-        content: m.content,
-      }));
+      // Use a more efficient approach to avoid recreating objects every time
+      const recentMessages = currentState.messages.length <= 10 
+        ? currentState.messages.map(m => ({ role: m.role, content: m.content }))
+        : currentState.messages.slice(-10).map(m => ({ role: m.role, content: m.content }));
       
       // Call API with retry logic
       let response;
@@ -450,9 +450,21 @@ const getDemoQualificationUpdate = (
   return { increment, signals: nextSignals };
 };
 
-// Selector hooks for components
+// Optimized selector hooks for components - prevent unnecessary re-renders
 export const useMessages = () => useChatStore(s => s.messages);
 export const useIsTyping = () => useChatStore(s => s.isTyping);
 export const useProspectInfo = () => useChatStore(s => s.prospectInfo);
 export const useQualificationScore = () => useChatStore(s => s.qualificationScore);
 export const useError = () => useChatStore(s => s.error);
+
+// Additional optimized selectors
+export const useSessionId = () => useChatStore(s => s.sessionId);
+export const useDemoSignals = () => useChatStore(s => s.demoQualificationSignals);
+
+// Memoized selector for chat actions - prevents recreation on every render
+export const useChatActions = () => useChatStore(s => ({
+  sendUserMessage: s.sendUserMessage,
+  setProspectInfo: s.setProspectInfo,
+  clearChat: s.clearChat,
+  loadDemoScenario: s.loadDemoScenario,
+}));

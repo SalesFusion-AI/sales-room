@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { MessageSquareText } from 'lucide-react';
 import { useQualificationScore } from '../../store/chatStore';
 import { getQualificationConfig } from '../../config/qualificationConfig';
 import HandoffModal from './HandoffModal';
 
-export default function TalkToSalesButton() {
+function TalkToSalesButton() {
   const qualificationScore = useQualificationScore();
   const [isOpen, setIsOpen] = useState(false);
   const config = getQualificationConfig();
@@ -31,3 +31,5 @@ export default function TalkToSalesButton() {
     </>
   );
 }
+
+export default memo(TalkToSalesButton);
