@@ -77,7 +77,7 @@ export function isSuspiciousInput(input: string): {
   }
   
   // Check for SQL injection patterns
-  if /(union|select|drop|insert|update|delete)[\s\w]*\b/i.test(input)) {
+  if (/(union|select|drop|insert|update|delete)\s/i.test(input)) {
     reasons.push('SQL injection patterns detected');
   }
   

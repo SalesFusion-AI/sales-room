@@ -233,10 +233,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         timestamp: new Date(),
       };
       
-      // Atomic state update
+      // Atomic state update - include isProcessingMessage reset
       set(s => ({
         messages: [...s.messages, aiMessage],
         isTyping: false,
+        isProcessingMessage: false,
         sessionId: response.sessionId,
         error: null, // Clear any previous errors
       }));
@@ -252,9 +253,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     } catch (error) {
       console.error('Failed to send message:', error);
       
-      // Ensure we always clear the typing state and set error
+      // Ensure we always clear the typing and processing states on error
       set(() => ({
         isTyping: false,
+        isProcessingMessage: false,
         error: error instanceof Error ? error.message : 'Failed to send message',
       }));
       
@@ -305,6 +307,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         }
       ],
       sessionId: null,
+      isTyping: false,
+      isProcessingMessage: false,
       isQualified: false,
       qualificationScore: 0,
       qualificationStatus: qualificationService.initializeQualificationStatus(),
@@ -466,6 +470,7 @@ const getDemoQualificationUpdate = (
 // Optimized selector hooks for components - prevent unnecessary re-renders
 export const useMessages = () => useChatStore(s => s.messages);
 export const useIsTyping = () => useChatStore(s => s.isTyping);
+export const useIsProcessingMessage = () => useChatStore(s => s.isProcessingMessage);
 export const useProspectInfo = () => useChatStore(s => s.prospectInfo);
 export const useQualificationScore = () => useChatStore(s => s.qualificationScore);
 export const useError = () => useChatStore(s => s.error);

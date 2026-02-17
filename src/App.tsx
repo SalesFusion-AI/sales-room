@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo, memo, lazy, Suspense } from 'react';
 import { Send, MessageSquare, User, AlertCircle } from 'lucide-react';
-import { useMessages, useIsTyping, useProspectInfo, useError, useChatActions } from './store/chatStore';
+import { useMessages, useIsTyping, useIsProcessingMessage, useProspectInfo, useError, useChatActions } from './store/chatStore';
 import { validateMessage } from './utils/validation';
 import { debounce } from './utils/performance';
 import TalkToSalesButton from './components/TalkToSales/TalkToSalesButton';
@@ -67,6 +67,7 @@ function App() {
   const { sendUserMessage } = useChatActions();
   const messages = useMessages();
   const isTyping = useIsTyping();
+  const isProcessingMessage = useIsProcessingMessage();
   const prospectInfo = useProspectInfo();
   const error = useError();
   const [inputMessage, setInputMessage] = useState('');
@@ -126,7 +127,8 @@ function App() {
       return;
     }
     
-    if (isTyping) return;
+    // Prevent sending if already typing or processing
+    if (isTyping || isProcessingMessage) return;
     
     // Final validation before sending
     const validation = validateMessage(trimmedMessage, { maxLength: 500, minLength: 1 });
@@ -138,7 +140,7 @@ function App() {
     setInputMessage('');
     setInputError(null);
     await sendUserMessage(trimmedMessage);
-  }, [inputMessage, isTyping, sendUserMessage]);
+  }, [inputMessage, isTyping, isProcessingMessage, sendUserMessage]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -148,12 +150,12 @@ function App() {
   }, [handleSendMessage]);
 
   const handlePromptClick = useCallback((prompt: string) => {
-    if (!isTyping) {
+    if (!isTyping && !isProcessingMessage) {
       setInputMessage('');
       setInputError(null);
       sendUserMessage(prompt);
     }
-  }, [isTyping, sendUserMessage]);
+  }, [isTyping, isProcessingMessage, sendUserMessage]);
 
   // Memoize suggested prompts to prevent recreation on every render
   const suggestedPrompts = useMemo(() => [
@@ -228,7 +230,7 @@ function App() {
                   className={`w-full min-h-[44px] glass-input px-4 py-3 placeholder:text-[var(--text-secondary)] ${
                     inputError ? 'border-red-500 focus:border-red-500' : ''
                   }`}
-                  disabled={isTyping}
+                  disabled={isTyping || isProcessingMessage}
                 />
                 {inputError && (
                   <p className="text-red-400 text-xs mt-1 px-2">
@@ -238,7 +240,7 @@ function App() {
               </div>
               <button
                 onClick={handleSendMessage}
-                disabled={!inputMessage.trim() || isTyping || !!inputError}
+                disabled={!inputMessage.trim() || isTyping || isProcessingMessage || !!inputError}
                 className="min-h-[44px] min-w-[44px] bg-white text-black hover:bg-[#f5f5f5] disabled:opacity-40 disabled:cursor-not-allowed px-4 sm:px-6 py-3 rounded-2xl transition-all duration-200 flex items-center justify-center shadow-lg hover:shadow-xl"
                 aria-label="Send message"
               >

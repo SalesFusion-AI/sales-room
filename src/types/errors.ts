@@ -90,8 +90,9 @@ export const ErrorHandlers = {
    * Check if error is recoverable
    */
   isRecoverable(error: unknown): boolean {
-    if (error instanceof AppError) {
-      return error.severity !== 'critical' && !['FATAL_ERROR', 'SYSTEM_ERROR'].includes(error.code || '');
+    if (error && typeof error === 'object' && 'severity' in error && 'code' in error) {
+      const appError = error as AppError;
+      return appError.severity !== 'critical' && !['FATAL_ERROR', 'SYSTEM_ERROR'].includes(appError.code || '');
     }
     return true; // Assume recoverable by default
   },

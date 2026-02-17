@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, Home, MessageSquare } from 'lucide-react';
+import { ErrorHandlers } from '../../types/errors';
 
 interface Props {
   children: ReactNode;
