@@ -254,7 +254,7 @@ function App() {
                 <button
                   key={prompt}
                   onClick={() => handlePromptClick(prompt)}
-                  disabled={isTyping}
+                  disabled={isTyping || isProcessingMessage}
                   className="min-h-[44px] text-xs sm:text-sm bg-[#111]/70 hover:bg-[#1a1a1a] disabled:opacity-50 text-[var(--text-secondary)] hover:text-white px-3 sm:px-4 py-2.5 rounded-2xl border border-[#222] hover:border-white/20 transition-all duration-200 backdrop-blur-[24px]"
                 >
                   {prompt}
