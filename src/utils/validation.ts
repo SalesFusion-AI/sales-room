@@ -2,6 +2,9 @@
  * Input validation utilities for the Sales Room application
  */
 
+import { ValidationError } from '../types/errors';
+import { sanitizeInput as securitySanitize, isSuspiciousInput } from './security';
+
 export interface ValidationResult {
   isValid: boolean;
   error?: string;
@@ -70,6 +73,15 @@ export function validateMessage(
     return {
       isValid: false,
       error: 'Message contains invalid content'
+    };
+  }
+
+  // Check for suspicious patterns using security utility
+  const suspiciousCheck = isSuspiciousInput(trimmedMessage);
+  if (suspiciousCheck.suspicious) {
+    return {
+      isValid: false,
+      error: 'Message contains potentially harmful content'
     };
   }
 
@@ -263,21 +275,15 @@ function isExcessivelyFormatted(text: string): boolean {
 
 /**
  * Sanitize user input by removing potentially dangerous content
+ * Uses the security utility for comprehensive sanitization
  */
-export function sanitizeInput(input: string): string {
-  if (!input) return '';
-  
-  return input
-    .trim()
-    // Remove potentially dangerous tags and attributes
-    .replace(/<script[^>]*>.*?<\/script>/gi, '')
-    .replace(/<iframe[^>]*>.*?<\/iframe>/gi, '')
-    .replace(/javascript:/gi, '')
-    .replace(/vbscript:/gi, '')
-    .replace(/on\w+\s*=/gi, '')
-    // Normalize whitespace
-    .replace(/\s+/g, ' ')
-    .trim();
+export function sanitizeInput(input: string, maxLength = 1000): string {
+  return securitySanitize(input, {
+    maxLength,
+    allowNewlines: true,
+    allowHtml: false,
+    preserveCase: true,
+  });
 }
 
 /**

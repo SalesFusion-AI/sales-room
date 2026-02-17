@@ -23,6 +23,7 @@ interface ProspectInfo {
 interface ChatStore {
   messages: Message[];
   isTyping: boolean;
+  isProcessingMessage: boolean; // Prevents concurrent message processing
   sessionId: string | null;
   prospectInfo: ProspectInfo;
   isQualified: boolean;
@@ -54,6 +55,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
   ],
   isTyping: false,
+  isProcessingMessage: false,
   sessionId: null,
   prospectInfo: {
     name: '',
@@ -73,12 +75,23 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   error: null,
   
   sendUserMessage: async (content: string) => {
+    // Prevent concurrent message processing (race condition guard)
+    const currentState = get();
+    if (currentState.isProcessingMessage) {
+      console.warn('Message processing already in progress, ignoring duplicate request');
+      return;
+    }
+
+    // Set processing flag immediately
+    set(() => ({ isProcessingMessage: true, error: null }));
+
     try {
       // Validate and sanitize input
       const validation = validateMessage(content, { maxLength: 500, minLength: 1 });
       if (!validation.isValid) {
         set(() => ({
           error: validation.error || 'Invalid message',
+          isProcessingMessage: false,
         }));
         return;
       }
