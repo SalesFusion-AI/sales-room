@@ -479,6 +479,10 @@ export const useError = () => useChatStore(s => s.error);
 export const useSessionId = () => useChatStore(s => s.sessionId);
 export const useDemoSignals = () => useChatStore(s => s.demoQualificationSignals);
 
+// Dedicated action selectors for stable references
+export const useSendUserMessage = () => useChatStore(s => s.sendUserMessage);
+export const useLoadDemoScenario = () => useChatStore(s => s.loadDemoScenario);
+
 // Memoized selector for chat actions - prevents recreation on every render
 export const useChatActions = () => useChatStore(s => ({
   sendUserMessage: s.sendUserMessage,
