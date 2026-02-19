@@ -1,7 +1,7 @@
 import React, { useEffect, useState, memo, useCallback, useMemo } from 'react';
 import { X, CheckCircle2, AlertCircle, Play } from 'lucide-react';
 import { useAiModel, useAiApiKey, useSettingsActions } from '../../store/settingsStore';
-import { useChatActions } from '../../store/chatStore';
+import { useLoadDemoScenario } from '../../store/chatStore';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -21,7 +21,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
   const aiModel = useAiModel();
   const aiApiKey = useAiApiKey();
   const { setAiModel, setApiKey } = useSettingsActions();
-  const { loadDemoScenario } = useChatActions();
+  const loadDemoScenario = useLoadDemoScenario();
   const [draftModel, setDraftModel] = useState(aiModel);
   const [draftKey, setDraftKey] = useState(aiApiKey);
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);

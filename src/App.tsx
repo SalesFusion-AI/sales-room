@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo, memo, lazy, Suspense } from 'react';
 import { Send, MessageSquare, User, AlertCircle } from 'lucide-react';
-import { useMessages, useIsTyping, useIsProcessingMessage, useProspectInfo, useError, useChatActions } from './store/chatStore';
+import { useMessages, useIsTyping, useIsProcessingMessage, useProspectInfo, useError, useSendUserMessage } from './store/chatStore';
 import { validateMessage } from './utils/validation';
 import { debounce } from './utils/performance';
 import TalkToSalesButton from './components/TalkToSales/TalkToSalesButton';
@@ -64,7 +64,7 @@ ProspectIndicator.displayName = 'ProspectIndicator';
 
 function App() {
   // Use optimized selectors to prevent unnecessary re-renders
-  const { sendUserMessage } = useChatActions();
+  const sendUserMessage = useSendUserMessage();
   const messages = useMessages();
   const isTyping = useIsTyping();
   const isProcessingMessage = useIsProcessingMessage();
