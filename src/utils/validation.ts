@@ -2,7 +2,6 @@
  * Input validation utilities for the Sales Room application
  */
 
-import { ValidationError } from '../types/errors';
 import { sanitizeInput as securitySanitize, isSuspiciousInput } from './security';
 
 export interface ValidationResult {
@@ -30,7 +29,7 @@ export interface NameValidationOptions {
  * Validate chat message input
  */
 export function validateMessage(
-  message: string, 
+  message: string,
   options: MessageValidationOptions = {}
 ): ValidationResult {
   const {
@@ -51,6 +50,15 @@ export function validateMessage(
   }
 
   const trimmedMessage = message.trim();
+
+  // Sanitize early for XSS prevention
+  const sanitizedMessage = sanitizeInput(trimmedMessage, maxLength);
+  if (!sanitizedMessage) {
+    return {
+      isValid: false,
+      error: 'Message contains invalid content'
+    };
+  }
 
   // Check minimum length
   if (trimmedMessage.length < minLength) {
@@ -100,7 +108,7 @@ export function validateMessage(
  * Validate email address
  */
 export function validateEmail(
-  email: string, 
+  email: string,
   options: EmailValidationOptions = {}
 ): ValidationResult {
   const { required = false } = options;
@@ -116,17 +124,7 @@ export function validateEmail(
     return { isValid: true };
   }
 
-  const trimmedEmail = email.trim();
-
-  // Basic email regex pattern
-  const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-  
-  if (!emailPattern.test(trimmedEmail)) {
-    return {
-      isValid: false,
-      error: 'Please enter a valid email address'
-    };
-  }
+  const trimmedEmail = email.trim().toLowerCase();
 
   // Check for reasonable length (most email providers have limits)
   if (trimmedEmail.length > 254) {
@@ -136,6 +134,78 @@ export function validateEmail(
     };
   }
 
+  const emailParts = trimmedEmail.split('@');
+  if (emailParts.length !== 2) {
+    return {
+      isValid: false,
+      error: 'Please enter a valid email address'
+    };
+  }
+
+  const [localPart, domain] = emailParts;
+
+  if (!localPart || !domain) {
+    return {
+      isValid: false,
+      error: 'Please enter a valid email address'
+    };
+  }
+
+  if (localPart.length > 64) {
+    return {
+      isValid: false,
+      error: 'Email address is too long'
+    };
+  }
+
+  if (localPart.startsWith('.') || localPart.endsWith('.') || /\.\./.test(localPart)) {
+    return {
+      isValid: false,
+      error: 'Please enter a valid email address'
+    };
+  }
+
+  if (domain.startsWith('-') || domain.endsWith('-') || /\.\./.test(domain)) {
+    return {
+      isValid: false,
+      error: 'Please enter a valid email address'
+    };
+  }
+
+  // Validate local part characters
+  const localPattern = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+$/i;
+  if (!localPattern.test(localPart)) {
+    return {
+      isValid: false,
+      error: 'Please enter a valid email address'
+    };
+  }
+
+  // Validate domain labels
+  const domainLabels = domain.split('.');
+  if (domainLabels.length < 2) {
+    return {
+      isValid: false,
+      error: 'Please enter a valid email address'
+    };
+  }
+
+  const labelPattern = /^[a-z0-9-]+$/i;
+  for (const label of domainLabels) {
+    if (!label || label.length > 63) {
+      return {
+        isValid: false,
+        error: 'Please enter a valid email address'
+      };
+    }
+    if (!labelPattern.test(label) || label.startsWith('-') || label.endsWith('-')) {
+      return {
+        isValid: false,
+        error: 'Please enter a valid email address'
+      };
+    }
+  }
+
   return { isValid: true };
 }
 
@@ -143,7 +213,7 @@ export function validateEmail(
  * Validate name input
  */
 export function validateName(
-  name: string, 
+  name: string,
   options: NameValidationOptions = {}
 ): ValidationResult {
   const {
@@ -259,7 +329,7 @@ function isExcessivelyFormatted(text: string): boolean {
   }
 
   // Check for excessive special characters
-  const specialCharCount = (text.match(/[!@#$%^&*()_+={}[\]:";'<>?,./~`]/g) || []).length;
+  const specialCharCount = (text.match(/[!@#$%^&*()_+={}\[\]:";'<>?,./~`]/g) || []).length;
   if (specialCharCount > text.length * 0.3) {
     return true;
   }
@@ -278,12 +348,15 @@ function isExcessivelyFormatted(text: string): boolean {
  * Uses the security utility for comprehensive sanitization
  */
 export function sanitizeInput(input: string, maxLength = 1000): string {
-  return securitySanitize(input, {
+  const sanitized = securitySanitize(input, {
     maxLength,
     allowNewlines: true,
     allowHtml: false,
     preserveCase: true,
   });
+
+  // Strip control characters (except newlines already normalized)
+  return sanitized.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '');
 }
 
 /**

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo, memo, lazy, Suspense } from 'react';
 import { Send, MessageSquare, User, AlertCircle } from 'lucide-react';
-import { useMessages, useIsTyping, useIsProcessingMessage, useProspectInfo, useError, useSendUserMessage } from './store/chatStore';
+import { useMessages, useIsTyping, useIsProcessingMessage, useProspectName, useError, useSendUserMessage } from './store/chatStore';
 import { validateMessage } from './utils/validation';
 import { debounce } from './utils/performance';
 import TalkToSalesButton from './components/TalkToSales/TalkToSalesButton';
@@ -68,7 +68,7 @@ function App() {
   const messages = useMessages();
   const isTyping = useIsTyping();
   const isProcessingMessage = useIsProcessingMessage();
-  const prospectInfo = useProspectInfo();
+  const prospectName = useProspectName();
   const error = useError();
   const [inputMessage, setInputMessage] = useState('');
   const [inputError, setInputError] = useState<string | null>(null);
@@ -83,7 +83,7 @@ function App() {
         messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
       }
     };
-    
+
     requestAnimationFrame(scrollToBottom);
   }, [messages, isTyping]);
 
@@ -108,12 +108,12 @@ function App() {
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setInputMessage(value);
-    
+
     // Clear previous error immediately for better UX
     if (inputError) {
       setInputError(null);
     }
-    
+
     // Debounced validation
     debouncedValidation(value);
   }, [inputError, debouncedValidation]);
@@ -121,22 +121,22 @@ function App() {
   // Memoize handlers to prevent unnecessary re-renders of child components
   const handleSendMessage = useCallback(async () => {
     const trimmedMessage = inputMessage.trim();
-    
+
     if (!trimmedMessage) {
       setInputError('Message cannot be empty');
       return;
     }
-    
+
     // Prevent sending if already typing or processing
     if (isTyping || isProcessingMessage) return;
-    
+
     // Final validation before sending
     const validation = validateMessage(trimmedMessage, { maxLength: 500, minLength: 1 });
     if (!validation.isValid) {
       setInputError(validation.error || 'Invalid message');
       return;
     }
-    
+
     setInputMessage('');
     setInputError(null);
     await sendUserMessage(trimmedMessage);
@@ -181,10 +181,10 @@ function App() {
                 <p className="text-xs sm:text-sm text-[var(--text-secondary)]">Your Sales Automation Assistant</p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3">
               {/* Prospect info indicator */}
-              {prospectInfo.name && <ProspectIndicator name={prospectInfo.name} />}
+              {prospectName && <ProspectIndicator name={prospectName} />}
               <SettingsButton onClick={() => setIsSettingsOpen(true)} />
             </div>
           </div>
@@ -194,7 +194,7 @@ function App() {
       {/* Main Chat Container */}
       <div className="flex-1 flex flex-col min-h-0 max-w-4xl mx-auto w-full">
         <div className="flex-1 flex flex-col glass-panel mx-3 sm:mx-4 my-3 sm:my-4 rounded-2xl sm:rounded-3xl overflow-hidden">
-          
+
           {/* Error Banner */}
           {error && (
             <div className="flex-shrink-0 bg-red-900/50 border-b border-red-800 px-4 py-3">
@@ -271,7 +271,7 @@ function App() {
           onClose={() => setIsSettingsOpen(false)}
         />
       </Suspense>
-      
+
       {/* Talk to Sales floating button - appears when qualification score > 75 */}
       <TalkToSalesButton />
     </div>

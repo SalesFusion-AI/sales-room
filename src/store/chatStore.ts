@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { shallow } from 'zustand/shallow';
 import { sendMessage } from '../services/chatService';
 import { qualificationService } from '../services/qualificationService';
 import { demoService } from '../demo/demoService';
@@ -24,6 +25,7 @@ interface ChatStore {
   messages: Message[];
   isTyping: boolean;
   isProcessingMessage: boolean; // Prevents concurrent message processing
+  activeRequestId: string | null; // Guards against stale async updates
   sessionId: string | null;
   prospectInfo: ProspectInfo;
   isQualified: boolean;
@@ -37,7 +39,7 @@ interface ChatStore {
     demoPricing: boolean;
   };
   error: string | null;
-  
+
   // Actions
   sendUserMessage: (content: string) => Promise<void>;
   setProspectInfo: (info: Partial<ProspectInfo>) => void;
@@ -56,6 +58,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   ],
   isTyping: false,
   isProcessingMessage: false,
+  activeRequestId: null,
   sessionId: null,
   prospectInfo: {
     name: '',
@@ -73,7 +76,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     demoPricing: false,
   },
   error: null,
-  
+
   sendUserMessage: async (content: string) => {
     // Prevent concurrent message processing (race condition guard)
     const currentState = get();
@@ -82,17 +85,25 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       return;
     }
 
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const isActiveRequest = () => get().activeRequestId === requestId;
+
     // Set processing flag immediately
-    set(() => ({ isProcessingMessage: true, error: null }));
+    set(() => ({ isProcessingMessage: true, error: null, activeRequestId: requestId }));
 
     try {
       // Validate and sanitize input
       const validation = validateMessage(content, { maxLength: 500, minLength: 1 });
       if (!validation.isValid) {
-        set(() => ({
-          error: validation.error || 'Invalid message',
-          isProcessingMessage: false,
-        }));
+        set(s =>
+          s.activeRequestId === requestId
+            ? {
+                error: validation.error || 'Invalid message',
+                isProcessingMessage: false,
+                activeRequestId: null,
+              }
+            : {}
+        );
         return;
       }
 
@@ -105,7 +116,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         role: 'user',
         timestamp: new Date(),
       };
-      
+
       // Optimistic update - add user message and set typing state
       set(s => ({
         messages: [...s.messages, userMessage],
@@ -118,6 +129,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
       const updateQualificationStatus = async (options?: { messageContent?: string; demoMode?: boolean }) => {
         try {
+          if (!isActiveRequest()) return;
+
           const currentState = get();
           const updated = await qualificationService.assessQualificationFromMessages(
             currentState.messages,
@@ -126,6 +139,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
           // Use functional update to avoid stale state
           set(s => {
+            if (s.activeRequestId !== requestId) return {};
+
             // Ensure we're working with the latest state
             const nextStatus = { ...s.qualificationStatus, ...updated };
             const baseScore = typeof updated.score === 'number' ? updated.score : nextStatus.score;
@@ -134,8 +149,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
             if (options?.demoMode) {
               const demoUpdate = getDemoQualificationUpdate(
-                options.messageContent ?? '', 
-                s.demoQualificationSignals, 
+                options.messageContent ?? '',
+                s.demoQualificationSignals,
                 s.prospectInfo
               );
               nextSignals = { ...demoUpdate.signals };
@@ -186,16 +201,17 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
       // Initial qualification update
       await updateQualificationStatus();
-      
+      if (!isActiveRequest()) return;
+
       // Get fresh state for API call
       const currentState = get();
 
       // Build context from conversation history (limit to last 10 messages to avoid token limits)
       // Use a more efficient approach to avoid recreating objects every time
-      const recentMessages = currentState.messages.length <= 10 
+      const recentMessages = currentState.messages.length <= 10
         ? currentState.messages.map(m => ({ role: m.role, content: m.content }))
         : currentState.messages.slice(-10).map(m => ({ role: m.role, content: m.content }));
-      
+
       // Call API with retry logic
       let response;
       let retryCount = 0;
@@ -215,7 +231,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
           if (retryCount > maxRetries) {
             throw apiError; // Final failure after retries
           }
-          
+
           // Wait before retry (exponential backoff)
           await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
         }
@@ -224,7 +240,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       if (!response) {
         throw new Error('Failed to get response after retries');
       }
-      
+
+      if (!isActiveRequest()) return;
+
       // Add AI response with updated state
       const aiMessage: Message = {
         id: `assistant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -232,42 +250,54 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         role: 'assistant',
         timestamp: new Date(),
       };
-      
+
       // Atomic state update - include isProcessingMessage reset
-      set(s => ({
-        messages: [...s.messages, aiMessage],
-        isTyping: false,
-        isProcessingMessage: false,
-        sessionId: response.sessionId,
-        error: null, // Clear any previous errors
-      }));
+      set(s =>
+        s.activeRequestId === requestId
+          ? {
+              messages: [...s.messages, aiMessage],
+              isTyping: false,
+              isProcessingMessage: false,
+              activeRequestId: null,
+              sessionId: response.sessionId,
+              error: null, // Clear any previous errors
+            }
+          : {}
+      );
 
       // Post-response qualification update
       const finalState = get();
-      const demoMode = demoService.isDemoActive() || 
-                      isDemoSessionId(response.sessionId) || 
-                      isDemoSessionId(finalState.sessionId);
-      
+      const demoMode = demoService.isDemoActive() ||
+        isDemoSessionId(response.sessionId) ||
+        isDemoSessionId(finalState.sessionId);
+
       await updateQualificationStatus({ messageContent: sanitizedContent, demoMode });
-      
     } catch (error) {
       console.error('Failed to send message:', error);
-      
+
       // Ensure we always clear the typing and processing states on error
-      set(() => ({
-        isTyping: false,
-        isProcessingMessage: false,
-        error: error instanceof Error ? error.message : 'Failed to send message',
-      }));
-      
+      set(s =>
+        s.activeRequestId === requestId
+          ? {
+              isTyping: false,
+              isProcessingMessage: false,
+              activeRequestId: null,
+              error: error instanceof Error ? error.message : 'Failed to send message',
+            }
+          : {}
+      );
+
       // Don't rethrow - let the UI handle the error state
+    } finally {
+      // Guard against stale updates when a new request has started
+      set(s => (s.activeRequestId === requestId ? { isProcessingMessage: false, isTyping: false, activeRequestId: null } : {}));
     }
   },
-  
+
   setProspectInfo: (info: Partial<ProspectInfo>) => {
     // Validate prospect information before setting
     const validation = validateProspectInfo(info);
-    
+
     if (!validation.isValid) {
       // Log validation errors but don't prevent setting (for flexibility)
       console.warn('Prospect info validation warnings:', validation.errors);
@@ -275,15 +305,15 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
     // Sanitize the input data
     const sanitizedInfo: Partial<ProspectInfo> = {};
-    
+
     if (info.name !== undefined) {
       sanitizedInfo.name = sanitizeInput(info.name).substring(0, 50); // Limit length
     }
-    
+
     if (info.email !== undefined) {
       sanitizedInfo.email = sanitizeInput(info.email).toLowerCase().substring(0, 254);
     }
-    
+
     if (info.company !== undefined) {
       sanitizedInfo.company = sanitizeInput(info.company).substring(0, 100);
     }
@@ -292,11 +322,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       prospectInfo: { ...s.prospectInfo, ...sanitizedInfo },
     }));
   },
-  
+
   clearChat: () => {
     // Reset Slack notification state for new session
     resetNotificationState();
-    
+
     set({
       messages: [
         {
@@ -309,6 +339,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       sessionId: null,
       isTyping: false,
       isProcessingMessage: false,
+      activeRequestId: null,
       isQualified: false,
       qualificationScore: 0,
       qualificationStatus: qualificationService.initializeQualificationStatus(),
@@ -369,6 +400,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set({
       messages: hotLeadMessages,
       isTyping: false,
+      isProcessingMessage: false,
+      activeRequestId: null,
       sessionId: 'demo-session-001',
       prospectInfo: {
         name: 'Sarah Chen',
@@ -402,7 +435,7 @@ function extractProspectInfo(
       prospectInfo: { ...s.prospectInfo, name: nameMatch[1].trim() },
     }));
   }
-  
+
   // Extract company
   const companyMatch = message.match(/(?:work at |work for |company is |at )([A-Z][a-zA-Z0-9 ]+)/i);
   if (companyMatch) {
@@ -410,7 +443,7 @@ function extractProspectInfo(
       prospectInfo: { ...s.prospectInfo, company: companyMatch[1].trim() },
     }));
   }
-  
+
   // Extract email
   const emailMatch = message.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
   if (emailMatch) {
@@ -472,6 +505,7 @@ export const useMessages = () => useChatStore(s => s.messages);
 export const useIsTyping = () => useChatStore(s => s.isTyping);
 export const useIsProcessingMessage = () => useChatStore(s => s.isProcessingMessage);
 export const useProspectInfo = () => useChatStore(s => s.prospectInfo);
+export const useProspectName = () => useChatStore(s => s.prospectInfo.name);
 export const useQualificationScore = () => useChatStore(s => s.qualificationScore);
 export const useError = () => useChatStore(s => s.error);
 
@@ -484,9 +518,13 @@ export const useSendUserMessage = () => useChatStore(s => s.sendUserMessage);
 export const useLoadDemoScenario = () => useChatStore(s => s.loadDemoScenario);
 
 // Memoized selector for chat actions - prevents recreation on every render
-export const useChatActions = () => useChatStore(s => ({
-  sendUserMessage: s.sendUserMessage,
-  setProspectInfo: s.setProspectInfo,
-  clearChat: s.clearChat,
-  loadDemoScenario: s.loadDemoScenario,
-}));
+export const useChatActions = () =>
+  useChatStore(
+    s => ({
+      sendUserMessage: s.sendUserMessage,
+      setProspectInfo: s.setProspectInfo,
+      clearChat: s.clearChat,
+      loadDemoScenario: s.loadDemoScenario,
+    }),
+    shallow
+  );
