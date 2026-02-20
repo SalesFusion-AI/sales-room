@@ -2,7 +2,6 @@
  * Input validation utilities for the Sales Room application
  */
 
-import { ValidationError } from '../types/errors';
 import { sanitizeInput as securitySanitize, isSuspiciousInput } from './security';
 
 export interface ValidationResult {
