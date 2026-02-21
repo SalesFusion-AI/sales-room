@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { shallow } from 'zustand/shallow';
+import { useShallow } from 'zustand/react/shallow';
 import { sendMessage } from '../services/chatService';
 import { qualificationService } from '../services/qualificationService';
 import { demoService } from '../demo/demoService';
@@ -520,11 +520,10 @@ export const useLoadDemoScenario = () => useChatStore(s => s.loadDemoScenario);
 // Memoized selector for chat actions - prevents recreation on every render
 export const useChatActions = () =>
   useChatStore(
-    s => ({
+    useShallow(s => ({
       sendUserMessage: s.sendUserMessage,
       setProspectInfo: s.setProspectInfo,
       clearChat: s.clearChat,
       loadDemoScenario: s.loadDemoScenario,
-    }),
-    shallow
+    }))
   );
