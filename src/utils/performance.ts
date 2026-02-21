@@ -29,7 +29,7 @@ export const measureRenderTime = (componentName: string) => {
 };
 
 // Debounce utility for performance-sensitive operations
-export const debounce = <T extends (...args: any[]) => any>(
+export const debounce = <T extends (...args: unknown[]) => unknown>(
   func: T,
   delay: number
 ): ((...args: Parameters<T>) => void) => {
@@ -45,7 +45,7 @@ export const debounce = <T extends (...args: any[]) => any>(
 };
 
 // Throttle utility for scroll/resize events
-export const throttle = <T extends (...args: any[]) => any>(
+export const throttle = <T extends (...args: unknown[]) => unknown>(
   func: T,
   limit: number
 ): ((...args: Parameters<T>) => void) => {
@@ -61,7 +61,7 @@ export const throttle = <T extends (...args: any[]) => any>(
 };
 
 // Memoization utility for expensive computations
-export const memoize = <T extends (...args: any[]) => any>(fn: T, maxCacheSize = 10) => {
+export const memoize = <T extends (...args: unknown[]) => unknown>(fn: T, maxCacheSize = 10) => {
   const cache = new Map<string, ReturnType<T>>();
   
   return (...args: Parameters<T>): ReturnType<T> => {
