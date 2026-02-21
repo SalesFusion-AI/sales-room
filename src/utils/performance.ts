@@ -29,7 +29,8 @@ export const measureRenderTime = (componentName: string) => {
 };
 
 // Debounce utility for performance-sensitive operations
-export const debounce = <T extends (...args: unknown[]) => unknown>(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const debounce = <T extends (...args: any[]) => any>(
   func: T,
   delay: number
 ): ((...args: Parameters<T>) => void) => {
@@ -45,7 +46,8 @@ export const debounce = <T extends (...args: unknown[]) => unknown>(
 };
 
 // Throttle utility for scroll/resize events
-export const throttle = <T extends (...args: unknown[]) => unknown>(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const throttle = <T extends (...args: any[]) => any>(
   func: T,
   limit: number
 ): ((...args: Parameters<T>) => void) => {
@@ -61,7 +63,8 @@ export const throttle = <T extends (...args: unknown[]) => unknown>(
 };
 
 // Memoization utility for expensive computations
-export const memoize = <T extends (...args: unknown[]) => unknown>(fn: T, maxCacheSize = 10) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const memoize = <T extends (...args: any[]) => any>(fn: T, maxCacheSize = 10) => {
   const cache = new Map<string, ReturnType<T>>();
   
   return (...args: Parameters<T>): ReturnType<T> => {
