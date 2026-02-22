@@ -20,6 +20,58 @@ interface ChatResponse {
   error?: string;
 }
 
+type ChatErrorKind = 'network' | 'timeout' | 'api' | 'invalid_response' | 'unknown';
+
+class ChatServiceError extends Error {
+  readonly kind: ChatErrorKind;
+  readonly status?: number;
+  readonly details?: string;
+
+  constructor(
+    message: string,
+    options: {
+      kind: ChatErrorKind;
+      status?: number;
+      details?: string;
+      cause?: unknown;
+    }
+  ) {
+    super(message, { cause: options.cause });
+    this.name = 'ChatServiceError';
+    this.kind = options.kind;
+    this.status = options.status;
+    this.details = options.details;
+  }
+}
+
+class NetworkError extends ChatServiceError {
+  constructor(message: string, cause?: unknown) {
+    super(message, { kind: 'network', cause });
+    this.name = 'NetworkError';
+  }
+}
+
+class TimeoutError extends ChatServiceError {
+  constructor(message: string, cause?: unknown) {
+    super(message, { kind: 'timeout', cause });
+    this.name = 'TimeoutError';
+  }
+}
+
+class ApiError extends ChatServiceError {
+  constructor(message: string, status: number, details?: string, cause?: unknown) {
+    super(message, { kind: 'api', status, details, cause });
+    this.name = 'ApiError';
+  }
+}
+
+class InvalidResponseError extends ChatServiceError {
+  constructor(message: string, details?: string, cause?: unknown) {
+    super(message, { kind: 'invalid_response', details, cause });
+    this.name = 'InvalidResponseError';
+  }
+}
+
 // Exponential backoff utility
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -34,7 +86,7 @@ export async function sendMessage(
 ): Promise<ChatResponse> {
   // Create cache key to prevent duplicate requests
   const cacheKey = `${message}_${sessionId}_${JSON.stringify(context)}`;
-  
+
   // Return existing promise if request is already in flight
   if (requestCache.has(cacheKey)) {
     const cachedPromise = requestCache.get(cacheKey)!;
@@ -42,15 +94,16 @@ export async function sendMessage(
   }
 
   const requestPromise = sendMessageInternal(message, sessionId, context);
-  
+
   // Cache the promise
   requestCache.set(cacheKey, requestPromise);
-  
-  // Clean up cache after TTL
-  setTimeout(() => {
-    requestCache.delete(cacheKey);
-  }, CACHE_TTL);
-  
+
+  const cleanup = () => requestCache.delete(cacheKey);
+  requestPromise.finally(cleanup);
+
+  // Clean up cache after TTL (fallback)
+  setTimeout(cleanup, CACHE_TTL);
+
   return requestPromise;
 }
 
@@ -63,16 +116,19 @@ async function sendMessageInternal(
   let lastError: Error | null = null;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let abortController: AbortController | null = null;
+
     try {
       const { aiModel, aiApiKey } = useSettingsStore.getState();
 
       // Create AbortController for timeout handling
-      const abortController = new AbortController();
+      abortController = new AbortController();
       const timeoutMs = attempt === 1 ? 15000 : 30000; // Shorter timeout on first attempt
-      const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
+      timeoutId = setTimeout(() => abortController?.abort(), timeoutMs);
 
       let response: Response;
-      
+
       try {
         response = await fetch(`${API_URL}/api/chat`, {
           method: 'POST',
@@ -89,25 +145,41 @@ async function sendMessageInternal(
           signal: abortController.signal,
         });
       } catch (fetchError) {
-        clearTimeout(timeoutId);
-        
-        // Handle specific error types
+        if (abortController && !abortController.signal.aborted) {
+          abortController.abort();
+        }
+
         if (fetchError instanceof Error) {
           if (fetchError.name === 'AbortError') {
-            lastError = new Error(`Request timeout (attempt ${attempt}/${maxRetries}) - please try again`);
-          } else if (fetchError.message.includes('Failed to fetch') || fetchError.message.includes('NetworkError')) {
-            lastError = new Error(`Network error (attempt ${attempt}/${maxRetries}): ${fetchError.message}`);
+            lastError = new TimeoutError(
+              `Request timeout (attempt ${attempt}/${maxRetries}) - please try again`,
+              fetchError
+            );
+          } else if (
+            fetchError.message.includes('Failed to fetch') ||
+            fetchError.message.includes('NetworkError')
+          ) {
+            lastError = new NetworkError(
+              `Network error (attempt ${attempt}/${maxRetries}): ${fetchError.message}`,
+              fetchError
+            );
           } else {
-            lastError = new Error(`Request failed (attempt ${attempt}/${maxRetries}): ${fetchError.message}`);
+            lastError = new ChatServiceError(
+              `Request failed (attempt ${attempt}/${maxRetries}): ${fetchError.message}`,
+              { kind: 'unknown', cause: fetchError }
+            );
           }
         } else {
-          lastError = new Error(`Unknown error (attempt ${attempt}/${maxRetries})`);
+          lastError = new ChatServiceError(`Unknown error (attempt ${attempt}/${maxRetries})`, {
+            kind: 'unknown',
+            cause: fetchError,
+          });
         }
-        
+
         // Don't retry on final attempt, throw or fallback
         if (attempt === maxRetries) {
           // Fallback to demo mode for network issues only
-          if (lastError.message.includes('Network error') || lastError.message.includes('Failed to fetch')) {
+          if (lastError instanceof NetworkError || lastError instanceof TimeoutError) {
             return {
               success: true,
               response: getDemoResponse(message),
@@ -116,26 +188,31 @@ async function sendMessageInternal(
           }
           throw lastError;
         }
-        
+
         // Exponential backoff before retry
         await delay(Math.pow(2, attempt - 1) * 1000);
         continue;
       }
-      
-      clearTimeout(timeoutId);
 
       let data: ChatResponse | { error?: string };
 
       try {
         const responseText = await response.text();
         if (!responseText.trim()) {
-          throw new Error('Empty response from server');
+          throw new InvalidResponseError('Empty response from server');
         }
         data = JSON.parse(responseText);
       } catch (parseError) {
         console.error(`JSON parse error on attempt ${attempt}:`, parseError);
-        lastError = new Error(`Invalid response format from chat service (attempt ${attempt}/${maxRetries})`);
-        
+        lastError =
+          parseError instanceof InvalidResponseError
+            ? parseError
+            : new InvalidResponseError(
+                `Invalid response format from chat service (attempt ${attempt}/${maxRetries})`,
+                undefined,
+                parseError
+              );
+
         // Don't retry parse errors on final attempt
         if (attempt === maxRetries) {
           throw lastError;
@@ -145,14 +222,19 @@ async function sendMessageInternal(
       }
 
       if (!response.ok) {
-        const errorMessage = (data as { error?: string }).error || `HTTP ${response.status}: ${response.statusText}`;
-        lastError = new Error(`API error (attempt ${attempt}/${maxRetries}): ${errorMessage}`);
-        
+        const errorMessage = (data as { error?: string }).error ||
+          `HTTP ${response.status}: ${response.statusText}`;
+        lastError = new ApiError(
+          `API error (attempt ${attempt}/${maxRetries}): ${errorMessage}`,
+          response.status,
+          errorMessage
+        );
+
         // Don't retry client errors (4xx), only server errors (5xx)
         if (response.status >= 400 && response.status < 500) {
           throw lastError;
         }
-        
+
         if (attempt === maxRetries) {
           throw lastError;
         }
@@ -163,8 +245,11 @@ async function sendMessageInternal(
       // Validate response structure
       const chatResponse = data as ChatResponse;
       if (!chatResponse.response || typeof chatResponse.response !== 'string') {
-        lastError = new Error(`Invalid response structure from chat service (attempt ${attempt}/${maxRetries})`);
-        
+        lastError = new InvalidResponseError(
+          `Invalid response structure from chat service (attempt ${attempt}/${maxRetries})`,
+          'Missing or invalid response field'
+        );
+
         if (attempt === maxRetries) {
           throw lastError;
         }
@@ -178,30 +263,34 @@ async function sendMessageInternal(
         response: chatResponse.response,
         sessionId: chatResponse.sessionId || sessionId || `session_${Date.now()}`,
       };
-      
     } catch (error) {
       // Log error details for debugging
       console.error(`Chat service error on attempt ${attempt}:`, error);
-      
-      lastError = error instanceof Error ? error : new Error('Unknown error occurred');
-      
+
+      lastError = error instanceof Error ? error : new ChatServiceError('Unknown error occurred', {
+        kind: 'unknown',
+        cause: error,
+      });
+
       // Don't retry on final attempt
       if (attempt === maxRetries) {
         break;
       }
-      
+
       // Exponential backoff before retry
       await delay(Math.pow(2, attempt - 1) * 1000);
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     }
   }
 
   // All retries exhausted, decide on fallback behavior
   const errorMessage = lastError?.message || 'Unknown error occurred';
-  
+
   // Fallback to demo mode for network/timeout errors only
-  if (errorMessage.includes('Network error') || 
-      errorMessage.includes('timeout') || 
-      errorMessage.includes('Failed to fetch')) {
+  if (lastError instanceof NetworkError || lastError instanceof TimeoutError) {
     console.warn('Falling back to demo mode due to network issues');
     return {
       success: true,
@@ -209,7 +298,7 @@ async function sendMessageInternal(
       sessionId: sessionId || `demo_${Date.now()}`,
     };
   }
-  
+
   // For other errors (validation, API errors), throw the error
   throw lastError || new Error('Request failed after all retries');
 }
