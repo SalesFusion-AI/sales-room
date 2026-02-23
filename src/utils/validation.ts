@@ -25,6 +25,12 @@ export interface NameValidationOptions {
   maxLength?: number;
 }
 
+export interface ApiKeyValidationOptions {
+  required?: boolean;
+  minLength?: number;
+  maxLength?: number;
+}
+
 /**
  * Validate chat message input
  */
@@ -224,6 +230,55 @@ export function validateCompany(company: string): ValidationResult {
     return {
       isValid: false,
       error: 'Company name contains invalid characters'
+    };
+  }
+
+  return { isValid: true };
+}
+
+/**
+ * Validate API key input (generic)
+ */
+export function validateApiKey(
+  apiKey: string,
+  options: ApiKeyValidationOptions = {}
+): ValidationResult {
+  const { required = false, minLength = 8, maxLength = 200 } = options;
+
+  if (!apiKey || !apiKey.trim()) {
+    if (required) {
+      return { isValid: false, error: 'API key is required' };
+    }
+    return { isValid: true };
+  }
+
+  const trimmedKey = apiKey.trim();
+
+  if (trimmedKey.length < minLength) {
+    return {
+      isValid: false,
+      error: `API key must be at least ${minLength} characters long`
+    };
+  }
+
+  if (trimmedKey.length > maxLength) {
+    return {
+      isValid: false,
+      error: 'API key is too long'
+    };
+  }
+
+  if (/\s/.test(trimmedKey)) {
+    return {
+      isValid: false,
+      error: 'API key cannot contain spaces'
+    };
+  }
+
+  if (containsMaliciousContent(trimmedKey)) {
+    return {
+      isValid: false,
+      error: 'API key contains invalid characters'
     };
   }
 

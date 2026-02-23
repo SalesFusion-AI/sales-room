@@ -41,7 +41,12 @@ export async function sendMessage(
     return cachedPromise;
   }
 
-  const requestPromise = sendMessageInternal(message, sessionId, context);
+  const requestPromise = sendMessageInternal(message, sessionId, context)
+    .catch((error) => {
+      // Clear cache immediately on error so future retries aren't blocked
+      requestCache.delete(cacheKey);
+      throw error;
+    });
   
   // Cache the promise
   requestCache.set(cacheKey, requestPromise);

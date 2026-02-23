@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo, memo, lazy, Suspense } from 'react';
 import { Send, MessageSquare, User, AlertCircle } from 'lucide-react';
-import { useMessages, useIsTyping, useIsProcessingMessage, useProspectInfo, useError, useSendUserMessage } from './store/chatStore';
+import { useChatStore } from './store/chatStore';
+import { useShallow } from 'zustand/shallow';
 import { validateMessage } from './utils/validation';
 import { debounce } from './utils/performance';
 import TalkToSalesButton from './components/TalkToSales/TalkToSalesButton';
@@ -64,12 +65,16 @@ ProspectIndicator.displayName = 'ProspectIndicator';
 
 function App() {
   // Use optimized selectors to prevent unnecessary re-renders
-  const sendUserMessage = useSendUserMessage();
-  const messages = useMessages();
-  const isTyping = useIsTyping();
-  const isProcessingMessage = useIsProcessingMessage();
-  const prospectInfo = useProspectInfo();
-  const error = useError();
+  const { sendUserMessage, messages, isTyping, isProcessingMessage, prospectInfo, error } = useChatStore(
+    useShallow((state) => ({
+      sendUserMessage: state.sendUserMessage,
+      messages: state.messages,
+      isTyping: state.isTyping,
+      isProcessingMessage: state.isProcessingMessage,
+      prospectInfo: state.prospectInfo,
+      error: state.error,
+    }))
+  );
   const [inputMessage, setInputMessage] = useState('');
   const [inputError, setInputError] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -150,11 +155,17 @@ function App() {
   }, [handleSendMessage]);
 
   const handlePromptClick = useCallback((prompt: string) => {
-    if (!isTyping && !isProcessingMessage) {
-      setInputMessage('');
-      setInputError(null);
-      sendUserMessage(prompt);
+    if (isTyping || isProcessingMessage) return;
+
+    const validation = validateMessage(prompt, { maxLength: 500, minLength: 1 });
+    if (!validation.isValid) {
+      setInputError(validation.error || 'Invalid message');
+      return;
     }
+
+    setInputMessage('');
+    setInputError(null);
+    sendUserMessage(prompt);
   }, [isTyping, isProcessingMessage, sendUserMessage]);
 
   // Memoize suggested prompts to prevent recreation on every render

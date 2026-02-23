@@ -2,6 +2,7 @@ import React, { useEffect, useState, memo, useCallback, useMemo } from 'react';
 import { X, CheckCircle2, AlertCircle, Play } from 'lucide-react';
 import { useAiModel, useAiApiKey, useSettingsActions } from '../../store/settingsStore';
 import { useLoadDemoScenario } from '../../store/chatStore';
+import { validateApiKey } from '../../utils/validation';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -25,6 +26,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
   const [draftModel, setDraftModel] = useState(aiModel);
   const [draftKey, setDraftKey] = useState(aiApiKey);
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [formErrors, setFormErrors] = useState<{ model?: string; apiKey?: string }>({});
   const [isTesting, setIsTesting] = useState(false);
   const [isLoadingDemo, setIsLoadingDemo] = useState(false);
 
@@ -33,16 +35,43 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
       setDraftModel(aiModel);
       setDraftKey(aiApiKey);
       setStatus(null);
+      setFormErrors({});
     }
   }, [isOpen, aiModel, aiApiKey]);
 
+  const validateInputs = useCallback(() => {
+    const nextErrors: { model?: string; apiKey?: string } = {};
+
+    if (!MODEL_OPTIONS.includes(draftModel)) {
+      nextErrors.model = 'Please choose a valid AI model.';
+    }
+
+    const apiKeyValidation = validateApiKey(draftKey);
+    if (!apiKeyValidation.isValid) {
+      nextErrors.apiKey = apiKeyValidation.error || 'Invalid API key.';
+    }
+
+    setFormErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  }, [draftModel, draftKey]);
+
   const handleSave = useCallback(() => {
+    if (!validateInputs()) {
+      setStatus({ type: 'error', message: 'Please fix the highlighted fields before saving.' });
+      return;
+    }
+
     setAiModel(draftModel);
-    setApiKey(draftKey);
+    setApiKey(draftKey.trim());
     setStatus({ type: 'success', message: 'Settings saved to your browser.' });
-  }, [draftModel, draftKey, setAiModel, setApiKey]);
+  }, [draftModel, draftKey, setAiModel, setApiKey, validateInputs]);
 
   const handleTestConnection = useCallback(async () => {
+    if (!validateInputs()) {
+      setStatus({ type: 'error', message: 'Please fix the highlighted fields before testing.' });
+      return;
+    }
+
     setIsTesting(true);
     setStatus(null);
 
@@ -57,7 +86,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
           sessionId: null,
           context: {},
           model: draftModel,
-          apiKey: draftKey,
+          apiKey: draftKey.trim(),
         }),
       });
 
@@ -73,7 +102,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
     } finally {
       setIsTesting(false);
     }
-  }, [draftModel, draftKey]);
+  }, [draftModel, draftKey, validateInputs]);
 
   const handleLoadDemo = useCallback(async () => {
     setIsLoadingDemo(true);
@@ -135,8 +164,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
             <label className="text-sm font-medium text-gray-200">AI Model</label>
             <select
               value={draftModel}
-              onChange={(event) => setDraftModel(event.target.value)}
-              className="w-full rounded-xl border border-[#222] bg-[#111] px-4 py-3 text-sm text-gray-100 focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-white/10"
+              onChange={(event) => {
+                setDraftModel(event.target.value);
+                setFormErrors((prev) => ({ ...prev, model: undefined }));
+              }}
+              className={`w-full rounded-xl border border-[#222] bg-[#111] px-4 py-3 text-sm text-gray-100 focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-white/10 ${
+                formErrors.model ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''
+              }`}
             >
               {modelOptions.map((option) => (
                 <option key={option} value={option} className="bg-[#111]">
@@ -144,6 +178,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
                 </option>
               ))}
             </select>
+            {formErrors.model && (
+              <p className="text-xs text-red-400">{formErrors.model}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -151,10 +188,18 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
             <input
               type="password"
               value={draftKey}
-              onChange={(event) => setDraftKey(event.target.value)}
+              onChange={(event) => {
+                setDraftKey(event.target.value);
+                setFormErrors((prev) => ({ ...prev, apiKey: undefined }));
+              }}
               placeholder="sk-..."
-              className="w-full rounded-xl border border-[#222] bg-[#111] px-4 py-3 text-sm text-gray-100 placeholder:text-gray-500 focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-white/10"
+              className={`w-full rounded-xl border border-[#222] bg-[#111] px-4 py-3 text-sm text-gray-100 placeholder:text-gray-500 focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-white/10 ${
+                formErrors.apiKey ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''
+              }`}
             />
+            {formErrors.apiKey && (
+              <p className="text-xs text-red-400">{formErrors.apiKey}</p>
+            )}
             <p className="text-xs text-gray-500">Stored locally in your browser.</p>
           </div>
 
