@@ -329,7 +329,7 @@ function isExcessivelyFormatted(text: string): boolean {
   }
 
   // Check for excessive special characters
-  const specialCharCount = (text.match(/[!@#$%^&*()_+={}\[\]:";'<>?,./~`]/g) || []).length;
+  const specialCharCount = (text.match(/[!@#$%^&*()_+={}[\]:";'<>?,./~`]/g) || []).length;
   if (specialCharCount > text.length * 0.3) {
     return true;
   }
@@ -356,6 +356,7 @@ export function sanitizeInput(input: string, maxLength = 1000): string {
   });
 
   // Strip control characters (except newlines already normalized)
+  // eslint-disable-next-line no-control-regex
   return sanitized.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '');
 }
 

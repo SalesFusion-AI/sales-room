@@ -287,7 +287,7 @@ async function sendMessageInternal(
   }
 
   // All retries exhausted, decide on fallback behavior
-  const errorMessage = lastError?.message || 'Unknown error occurred';
+  // (error message available via lastError if needed for logging)
 
   // Fallback to demo mode for network/timeout errors only
   if (lastError instanceof NetworkError || lastError instanceof TimeoutError) {
