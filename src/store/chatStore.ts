@@ -118,11 +118,15 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       };
 
       // Optimistic update - add user message and set typing state
-      set(s => ({
-        messages: [...s.messages, userMessage],
-        isTyping: true,
-        error: null,
-      }));
+      set(s =>
+        s.activeRequestId === requestId
+          ? {
+              messages: [...s.messages, userMessage],
+              isTyping: true,
+              error: null,
+            }
+          : {}
+      );
 
       // Extract prospect info early from user message
       extractProspectInfo(sanitizedContent, set);
@@ -203,14 +207,22 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       await updateQualificationStatus();
       if (!isActiveRequest()) return;
 
-      // Get fresh state for API call
-      const currentState = get();
+      const buildChatContext = () => {
+        const state = get();
+        const recentMessages = state.messages.length <= 10
+          ? state.messages.map(m => ({ role: m.role, content: m.content }))
+          : state.messages.slice(-10).map(m => ({ role: m.role, content: m.content }));
 
-      // Build context from conversation history (limit to last 10 messages to avoid token limits)
-      // Use a more efficient approach to avoid recreating objects every time
-      const recentMessages = currentState.messages.length <= 10
-        ? currentState.messages.map(m => ({ role: m.role, content: m.content }))
-        : currentState.messages.slice(-10).map(m => ({ role: m.role, content: m.content }));
+        return {
+          sessionId: state.sessionId,
+          context: {
+            prospectName: state.prospectInfo.name,
+            company: state.prospectInfo.company,
+            email: state.prospectInfo.email,
+            previousMessages: recentMessages,
+          },
+        };
+      };
 
       // Call API with retry logic
       let response;
@@ -219,12 +231,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
       while (retryCount <= maxRetries) {
         try {
-          response = await sendMessage(sanitizedContent, currentState.sessionId, {
-            prospectName: currentState.prospectInfo.name,
-            company: currentState.prospectInfo.company,
-            email: currentState.prospectInfo.email,
-            previousMessages: recentMessages,
-          });
+          const { sessionId, context } = buildChatContext();
+          response = await sendMessage(sanitizedContent, sessionId, context);
           break; // Success, exit retry loop
         } catch (apiError) {
           retryCount++;

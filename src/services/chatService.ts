@@ -194,35 +194,45 @@ async function sendMessageInternal(
         continue;
       }
 
-      let data: ChatResponse | { error?: string };
+      let data: ChatResponse | { error?: string } | null = null;
+      let responseText = '';
 
       try {
-        const responseText = await response.text();
-        if (!responseText.trim()) {
+        responseText = await response.text();
+
+        if (responseText.trim()) {
+          data = JSON.parse(responseText);
+        } else if (response.ok) {
           throw new InvalidResponseError('Empty response from server');
         }
-        data = JSON.parse(responseText);
       } catch (parseError) {
-        console.error(`JSON parse error on attempt ${attempt}:`, parseError);
-        lastError =
-          parseError instanceof InvalidResponseError
-            ? parseError
-            : new InvalidResponseError(
-                `Invalid response format from chat service (attempt ${attempt}/${maxRetries})`,
-                undefined,
-                parseError
-              );
+        if (response.ok) {
+          console.error(`JSON parse error on attempt ${attempt}:`, parseError);
+          lastError =
+            parseError instanceof InvalidResponseError
+              ? parseError
+              : new InvalidResponseError(
+                  `Invalid response format from chat service (attempt ${attempt}/${maxRetries})`,
+                  undefined,
+                  parseError
+                );
 
-        // Don't retry parse errors on final attempt
-        if (attempt === maxRetries) {
-          throw lastError;
+          // Don't retry parse errors on final attempt
+          if (attempt === maxRetries) {
+            throw lastError;
+          }
+          await delay(Math.pow(2, attempt - 1) * 1000);
+          continue;
         }
-        await delay(Math.pow(2, attempt - 1) * 1000);
-        continue;
+
+        // Non-JSON error responses should still surface as API errors
+        data = responseText.trim() ? { error: responseText.trim() } : null;
       }
 
       if (!response.ok) {
-        const errorMessage = (data as { error?: string }).error ||
+        const errorMessage =
+          (data as { error?: string } | null)?.error ||
+          responseText.trim() ||
           `HTTP ${response.status}: ${response.statusText}`;
         lastError = new ApiError(
           `API error (attempt ${attempt}/${maxRetries}): ${errorMessage}`,
@@ -234,6 +244,19 @@ async function sendMessageInternal(
         if (response.status >= 400 && response.status < 500) {
           throw lastError;
         }
+
+        if (attempt === maxRetries) {
+          throw lastError;
+        }
+        await delay(Math.pow(2, attempt - 1) * 1000);
+        continue;
+      }
+
+      if (!data) {
+        lastError = new InvalidResponseError(
+          `Invalid response format from chat service (attempt ${attempt}/${maxRetries})`,
+          'Empty response body'
+        );
 
         if (attempt === maxRetries) {
           throw lastError;
