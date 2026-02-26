@@ -53,7 +53,9 @@ export function validateMessage(
 
   // Sanitize early for XSS prevention
   const sanitizedMessage = sanitizeInput(trimmedMessage, maxLength);
-  if (!sanitizedMessage) {
+  const normalizedMessage = sanitizedMessage.trim();
+
+  if (!normalizedMessage) {
     return {
       isValid: false,
       error: 'Message contains invalid content'
@@ -61,7 +63,7 @@ export function validateMessage(
   }
 
   // Check minimum length
-  if (trimmedMessage.length < minLength) {
+  if (normalizedMessage.length < minLength) {
     return {
       isValid: false,
       error: `Message must be at least ${minLength} character${minLength > 1 ? 's' : ''} long`
@@ -69,7 +71,7 @@ export function validateMessage(
   }
 
   // Check maximum length
-  if (trimmedMessage.length > maxLength) {
+  if (normalizedMessage.length > maxLength) {
     return {
       isValid: false,
       error: `Message cannot exceed ${maxLength} characters`
@@ -94,7 +96,7 @@ export function validateMessage(
   }
 
   // Check for excessive whitespace or special characters
-  if (isExcessivelyFormatted(trimmedMessage)) {
+  if (isExcessivelyFormatted(normalizedMessage)) {
     return {
       isValid: false,
       error: 'Message contains excessive formatting or special characters'

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo, memo, lazy, Suspense } from 'react';
 import { Send, MessageSquare, User, AlertCircle } from 'lucide-react';
-import { useMessages, useIsTyping, useIsProcessingMessage, useProspectName, useError, useSendUserMessage } from './store/chatStore';
+import { useShallow } from 'zustand/react/shallow';
+import { useChatStore } from './store/chatStore';
 import { validateMessage } from './utils/validation';
 import { debounce } from './utils/performance';
 import TalkToSalesButton from './components/TalkToSales/TalkToSalesButton';
@@ -63,13 +64,24 @@ const ProspectIndicator = memo(({ name }: { name: string }) => (
 ProspectIndicator.displayName = 'ProspectIndicator';
 
 function App() {
-  // Use optimized selectors to prevent unnecessary re-renders
-  const sendUserMessage = useSendUserMessage();
-  const messages = useMessages();
-  const isTyping = useIsTyping();
-  const isProcessingMessage = useIsProcessingMessage();
-  const prospectName = useProspectName();
-  const error = useError();
+  // Use a single shallow selector to prevent unnecessary re-renders
+  const {
+    sendUserMessage,
+    messages,
+    isTyping,
+    isProcessingMessage,
+    prospectName,
+    error,
+  } = useChatStore(
+    useShallow(s => ({
+      sendUserMessage: s.sendUserMessage,
+      messages: s.messages,
+      isTyping: s.isTyping,
+      isProcessingMessage: s.isProcessingMessage,
+      prospectName: s.prospectInfo.name,
+      error: s.error,
+    }))
+  );
   const [inputMessage, setInputMessage] = useState('');
   const [inputError, setInputError] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
