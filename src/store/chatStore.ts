@@ -266,7 +266,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
               messages: [...s.messages, aiMessage],
               isTyping: false,
               isProcessingMessage: false,
-              activeRequestId: null,
               sessionId: response.sessionId,
               error: null, // Clear any previous errors
             }

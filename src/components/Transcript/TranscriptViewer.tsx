@@ -43,20 +43,30 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
   // Load conversation if sessionId provided
   useEffect(() => {
+    let isMounted = true;
+
     if (sessionId && !providedConversation) {
       const storedConversation = transcriptService.getConversationBySessionId(sessionId);
       if (storedConversation) {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setConversation(storedConversation);
-        
+
         // Load or generate summary
         const existingSummary = transcriptService.getSummary(sessionId);
         if (!existingSummary) {
           setLoading(true);
-          transcriptService.generateSummary(storedConversation).then(newSummary => {
-            setSummary(newSummary);
-            setLoading(false);
-          });
+          transcriptService.generateSummary(storedConversation)
+            .then(newSummary => {
+              if (!isMounted) return;
+              setSummary(newSummary);
+            })
+            .catch(() => {
+              if (!isMounted) return;
+            })
+            .finally(() => {
+              if (!isMounted) return;
+              setLoading(false);
+            });
         } else {
           setSummary(existingSummary);
         }
@@ -69,6 +79,10 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
         setSummary(existingSummary);
       }
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [sessionId, providedConversation]);
 
   // Compute highlighted messages from search term
@@ -245,6 +259,8 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
               <button
                 onClick={() => toggleSection('prospect')}
                 className="flex items-center justify-between w-full text-left"
+                aria-expanded={expandedSections.has('prospect')}
+                aria-controls="prospect-section"
               >
                 <h3 className="font-semibold text-gray-900">Prospect Information</h3>
                 {expandedSections.has('prospect') ? 
@@ -254,7 +270,7 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
               </button>
               
               {expandedSections.has('prospect') && (
-                <div className="mt-3 space-y-2 text-sm">
+                <div id="prospect-section" className="mt-3 space-y-2 text-sm">
                   {conversation.prospect.email && (
                     <div className="flex justify-between">
                       <span className="text-gray-600">Email:</span>
@@ -294,6 +310,8 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
               <button
                 onClick={() => toggleSection('qualification')}
                 className="flex items-center justify-between w-full text-left"
+                aria-expanded={expandedSections.has('qualification')}
+                aria-controls="qualification-section"
               >
                 <h3 className="font-semibold text-gray-900">Qualification</h3>
                 <div className="flex items-center space-x-2">
@@ -308,7 +326,7 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
               </button>
 
               {expandedSections.has('qualification') && (
-                <div className="mt-3 space-y-2">
+                <div id="qualification-section" className="mt-3 space-y-2">
                   {Object.values(conversation.qualificationStatus.criteria).map(criterion => (
                     <div key={criterion.id} className="flex items-center justify-between text-sm">
                       <div className="flex items-center space-x-2">
@@ -334,6 +352,8 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
                 <button
                   onClick={() => toggleSection('summary')}
                   className="flex items-center justify-between w-full text-left"
+                  aria-expanded={expandedSections.has('summary')}
+                  aria-controls="summary-section"
                 >
                   <div className="flex items-center space-x-2">
                     <Sparkles className="w-4 h-4 text-purple-600" />
@@ -346,7 +366,7 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
                 </button>
 
                 {expandedSections.has('summary') && (
-                  <div className="mt-3 space-y-3 text-sm">
+                  <div id="summary-section" className="mt-3 space-y-3 text-sm">
                     {summary.keyPoints.length > 0 && (
                       <div>
                         <h4 className="font-medium text-gray-900 mb-1">Key Points:</h4>
@@ -413,6 +433,7 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
                 placeholder="Search messages..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                aria-label="Search messages"
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>

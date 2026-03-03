@@ -116,6 +116,10 @@ function App() {
     []
   );
 
+  useEffect(() => () => {
+    debouncedValidation.cancel();
+  }, [debouncedValidation]);
+
   // Validate input as user types
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -233,6 +237,7 @@ function App() {
             <div className="flex items-center space-x-3 sm:space-x-4">
               <div className="flex-1">
                 <input
+                  id="chat-message-input"
                   type="text"
                   value={inputMessage}
                   onChange={handleInputChange}
@@ -243,9 +248,11 @@ function App() {
                     inputError ? 'border-red-500 focus:border-red-500' : ''
                   }`}
                   disabled={isTyping || isProcessingMessage}
+                  aria-invalid={!!inputError}
+                  aria-describedby={inputError ? 'chat-message-error' : undefined}
                 />
                 {inputError && (
-                  <p className="text-red-400 text-xs mt-1 px-2">
+                  <p id="chat-message-error" className="text-red-400 text-xs mt-1 px-2" role="alert">
                     {inputError}
                   </p>
                 )}

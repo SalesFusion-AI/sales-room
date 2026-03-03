@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   TrendingUp,
   MessageSquare,
@@ -61,13 +61,20 @@ const AnalyticsDashboard: React.FC = () => {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
     loadAnalytics();
   }, [timeRange]);
 
+  useEffect(() => () => {
+    isMountedRef.current = false;
+  }, []);
+
   const loadAnalytics = async () => {
-    setIsLoading(true);
+    if (isMountedRef.current) {
+      setIsLoading(true);
+    }
     try {
       // Try to load demo analytics first
       let analyticsData;
@@ -77,12 +84,16 @@ const AnalyticsDashboard: React.FC = () => {
         // Load real analytics
         analyticsData = transcriptService.getAnalytics();
       }
-      
-      setAnalytics(analyticsData);
+
+      if (isMountedRef.current) {
+        setAnalytics(analyticsData);
+      }
     } catch (error) {
       console.error('Failed to load analytics:', error);
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   };
 

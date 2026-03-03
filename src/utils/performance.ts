@@ -30,19 +30,33 @@ export const measureRenderTime = (componentName: string) => {
 
 // Debounce utility for performance-sensitive operations
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- needed for generic inference
+type DebouncedFunction<T extends (...args: any[]) => any> = ((...args: Parameters<T>) => void) & {
+  cancel: () => void;
+};
+
 export const debounce = <T extends (...args: any[]) => any>(
   func: T,
   delay: number
-): ((...args: Parameters<T>) => void) => {
-  let timeoutId: NodeJS.Timeout | null = null;
-  
-  return (...args: Parameters<T>) => {
+): DebouncedFunction<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  const debounced = (...args: Parameters<T>) => {
     if (timeoutId) clearTimeout(timeoutId);
-    
+
     timeoutId = setTimeout(() => {
+      timeoutId = null;
       func(...args);
     }, delay);
   };
+
+  debounced.cancel = () => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+  };
+
+  return debounced;
 };
 
 // Throttle utility for scroll/resize events

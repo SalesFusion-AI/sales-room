@@ -265,6 +265,22 @@ async function sendMessageInternal(
         continue;
       }
 
+      const apiErrorMessage = (data as { error?: string }).error;
+      const apiSuccess = (data as { success?: boolean }).success;
+      if (apiErrorMessage || apiSuccess === false) {
+        lastError = new ApiError(
+          `API error (attempt ${attempt}/${maxRetries}): ${apiErrorMessage || 'Unsuccessful response'}`,
+          response.status,
+          apiErrorMessage
+        );
+
+        if (attempt === maxRetries) {
+          throw lastError;
+        }
+        await delay(Math.pow(2, attempt - 1) * 1000);
+        continue;
+      }
+
       // Validate response structure
       const chatResponse = data as ChatResponse;
       if (!chatResponse.response || typeof chatResponse.response !== 'string') {

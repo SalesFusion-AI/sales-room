@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Search,
   Filter,
@@ -39,10 +39,15 @@ const TranscriptList: React.FC<TranscriptListProps> = ({
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState<Set<string>>(new Set());
+  const isMountedRef = useRef(true);
 
   // Load conversations
   useEffect(() => {
     loadConversations();
+
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   // Filter and sort conversations
@@ -94,14 +99,20 @@ const TranscriptList: React.FC<TranscriptListProps> = ({
   }, [conversations, searchTerm, sortBy, filterBy]);
 
   const loadConversations = async () => {
-    setLoading(true);
+    if (isMountedRef.current) {
+      setLoading(true);
+    }
     try {
       const stored = transcriptService.getStoredTranscripts();
-      setConversations(stored);
+      if (isMountedRef.current) {
+        setConversations(stored);
+      }
     } catch (error) {
       console.error('Failed to load conversations:', error);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -111,18 +122,20 @@ const TranscriptList: React.FC<TranscriptListProps> = ({
   };
 
   const handleSyncToCRM = async (conversation: StoredConversation) => {
-    setSyncing(prev => new Set(prev).add(conversation.sessionId));
-    
+    if (isMountedRef.current) {
+      setSyncing(prev => new Set(prev).add(conversation.sessionId));
+    }
+
     try {
       // Generate summary if not exists
       let summary = transcriptService.getSummary(conversation.sessionId);
       if (!summary) {
         summary = await transcriptService.generateSummary(conversation);
       }
-      
+
       // Sync to CRM
       const result = await crmService.syncConversation(conversation, summary);
-      
+
       if (result.success) {
         // Update conversation as synced
         const updatedConversation = {
@@ -130,18 +143,20 @@ const TranscriptList: React.FC<TranscriptListProps> = ({
           crmSynced: true,
           crmId: result.crmId
         };
-        
+
         await transcriptService.storeConversation(updatedConversation);
         loadConversations(); // Refresh list
       }
     } catch (error) {
       console.error('Failed to sync to CRM:', error);
     } finally {
-      setSyncing(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(conversation.sessionId);
-        return newSet;
-      });
+      if (isMountedRef.current) {
+        setSyncing(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(conversation.sessionId);
+          return newSet;
+        });
+      }
     }
   };
 
@@ -267,6 +282,7 @@ const TranscriptList: React.FC<TranscriptListProps> = ({
               placeholder="Search conversations, prospects, companies..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              aria-label="Search conversations"
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -295,6 +311,7 @@ const TranscriptList: React.FC<TranscriptListProps> = ({
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortBy)}
+              aria-label="Sort conversations"
               className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="date">Sort by Date</option>
@@ -306,6 +323,8 @@ const TranscriptList: React.FC<TranscriptListProps> = ({
             <button
               onClick={() => setShowFilters(!showFilters)}
               className="px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 flex items-center space-x-1"
+              aria-label={showFilters ? 'Hide advanced filters' : 'Show advanced filters'}
+              aria-expanded={showFilters}
             >
               <Filter className="w-4 h-4" />
               {showFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -461,6 +480,7 @@ const TranscriptList: React.FC<TranscriptListProps> = ({
                         }}
                         className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
                         title="View Details"
+                        aria-label="View conversation details"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
@@ -474,6 +494,7 @@ const TranscriptList: React.FC<TranscriptListProps> = ({
                           disabled={syncing.has(conversation.sessionId)}
                           className="p-2 text-gray-400 hover:text-green-600 transition-colors disabled:opacity-50"
                           title="Sync to CRM"
+                          aria-label="Sync conversation to CRM"
                         >
                           {syncing.has(conversation.sessionId) ? (
                             <RefreshCw className="w-4 h-4 animate-spin" />
@@ -484,7 +505,7 @@ const TranscriptList: React.FC<TranscriptListProps> = ({
                       )}
                       
                       {conversation.crmSynced && (
-                        <div className="p-2 text-green-600" title="Synced to CRM">
+                        <div className="p-2 text-green-600" title="Synced to CRM" aria-label="Synced to CRM">
                           <ExternalLink className="w-4 h-4" />
                         </div>
                       )}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, memo, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, memo, useCallback, useMemo, useRef } from 'react';
 import { X, CheckCircle2, AlertCircle, Play } from 'lucide-react';
 import { useAiModel, useAiApiKey, useSettingsActions } from '../../store/settingsStore';
 import { useLoadDemoScenario } from '../../store/chatStore';
@@ -27,6 +27,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isTesting, setIsTesting] = useState(false);
   const [isLoadingDemo, setIsLoadingDemo] = useState(false);
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -35,6 +36,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
       setStatus(null);
     }
   }, [isOpen, aiModel, aiApiKey]);
+
+  useEffect(() => () => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+  }, []);
 
   const handleSave = useCallback(() => {
     setAiModel(draftModel);
@@ -88,7 +96,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
       });
 
       // Auto-close settings panel after successful load
-      setTimeout(() => {
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+      }
+      closeTimeoutRef.current = setTimeout(() => {
         onClose();
       }, 2000);
     } catch (error) {
@@ -132,8 +143,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
 
         <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-200">AI Model</label>
+            <label htmlFor="ai-model" className="text-sm font-medium text-gray-200">AI Model</label>
             <select
+              id="ai-model"
               value={draftModel}
               onChange={(event) => setDraftModel(event.target.value)}
               className="w-full rounded-xl border border-[#222] bg-[#111] px-4 py-3 text-sm text-gray-100 focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-white/10"
@@ -147,8 +159,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-200">API Key</label>
+            <label htmlFor="ai-api-key" className="text-sm font-medium text-gray-200">API Key</label>
             <input
+              id="ai-api-key"
               type="password"
               value={draftKey}
               onChange={(event) => setDraftKey(event.target.value)}
