@@ -29,12 +29,13 @@ export const measureRenderTime = (componentName: string) => {
 };
 
 // Debounce utility for performance-sensitive operations
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- needed for generic inference
+/* eslint-disable @typescript-eslint/no-explicit-any -- needed for generic function inference */
 type DebouncedFunction<T extends (...args: any[]) => any> = ((...args: Parameters<T>) => void) & {
   cancel: () => void;
 };
 
 export const debounce = <T extends (...args: any[]) => any>(
+/* eslint-enable @typescript-eslint/no-explicit-any */
   func: T,
   delay: number
 ): DebouncedFunction<T> => {
