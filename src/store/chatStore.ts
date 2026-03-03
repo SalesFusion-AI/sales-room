@@ -7,6 +7,8 @@ import { validateMessage, validateProspectInfo, sanitizeInput } from '../utils/v
 import { notifyQualificationChange, resetNotificationState } from '../services/slackService';
 import { getQualificationConfig } from '../config/qualificationConfig';
 import type { QualificationStatus } from '../types';
+import { createLead } from '../services/leadService';
+import { DEFAULT_WORKSPACE_CONFIG, type WorkspaceConfig } from '../services/workspaceService';
 
 interface Message {
   id: string;
@@ -27,6 +29,10 @@ interface ChatStore {
   isProcessingMessage: boolean; // Prevents concurrent message processing
   activeRequestId: string | null; // Guards against stale async updates
   sessionId: string | null;
+  workspaceSlug: string | null;
+  workspaceConfig: WorkspaceConfig;
+  isEmbedMode: boolean;
+  leadCreated: boolean;
   prospectInfo: ProspectInfo;
   isQualified: boolean;
   qualificationScore: number;
@@ -42,6 +48,10 @@ interface ChatStore {
 
   // Actions
   sendUserMessage: (content: string) => Promise<void>;
+  createLeadFromConversation: (reason: 'qualified' | 'handoff') => Promise<void>;
+  setWorkspaceConfig: (config: WorkspaceConfig) => void;
+  setWorkspaceSlug: (slug: string | null) => void;
+  setEmbedMode: (embed: boolean) => void;
   setProspectInfo: (info: Partial<ProspectInfo>) => void;
   clearChat: () => void;
   loadDemoScenario: () => Promise<void>;
@@ -51,7 +61,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   messages: [
     {
       id: '1',
-      content: "Hi! I'm here to help you learn about our AI sales platform. What brings you here today?",
+      content: DEFAULT_WORKSPACE_CONFIG.messaging.welcomeMessage,
       role: 'assistant',
       timestamp: new Date(),
     }
@@ -60,6 +70,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   isProcessingMessage: false,
   activeRequestId: null,
   sessionId: null,
+  workspaceSlug: null,
+  workspaceConfig: DEFAULT_WORKSPACE_CONFIG,
+  isEmbedMode: false,
+  leadCreated: false,
   prospectInfo: {
     name: '',
     company: '',
@@ -232,7 +246,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       while (retryCount <= maxRetries) {
         try {
           const { sessionId, context } = buildChatContext();
-          response = await sendMessage(sanitizedContent, sessionId, context);
+          response = await sendMessage(sanitizedContent, sessionId, context, get().workspaceSlug);
           break; // Success, exit retry loop
         } catch (apiError) {
           retryCount++;
@@ -280,6 +294,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         isDemoSessionId(finalState.sessionId);
 
       await updateQualificationStatus({ messageContent: sanitizedContent, demoMode });
+      if (get().isQualified && !get().leadCreated) {
+        await get().createLeadFromConversation('qualified');
+      }
     } catch (error) {
       console.error('Failed to send message:', error);
 
@@ -300,6 +317,79 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       // Guard against stale updates when a new request has started
       set(s => (s.activeRequestId === requestId ? { isProcessingMessage: false, isTyping: false, activeRequestId: null } : {}));
     }
+  },
+
+  createLeadFromConversation: async (reason) => {
+    const state = get();
+    if (state.leadCreated) return;
+    if (!state.prospectInfo.email) {
+      console.warn('Lead creation skipped - missing email');
+      return;
+    }
+
+    const messages = state.messages;
+    const transcript = messages
+      .map(m => `${m.role === 'user' ? 'Prospect' : 'Assistant'}: ${m.content}`)
+      .join('\n');
+
+    const startedAt = messages[0]?.timestamp?.getTime() || Date.now();
+    const endedAt = messages[messages.length - 1]?.timestamp?.getTime() || startedAt;
+    const durationMinutes = Math.max(0, Math.round((endedAt - startedAt) / (1000 * 60)));
+
+    const qualification = state.qualificationStatus;
+    const budgetEvidence = qualification.criteria?.budget?.evidence?.[0];
+    const timelineEvidence = qualification.criteria?.timeline?.evidence?.[0];
+    const painPointEvidence = qualification.criteria?.need?.evidence || [];
+
+    const payload = {
+      email: state.prospectInfo.email,
+      firstName: state.prospectInfo.name?.split(' ')[0],
+      lastName: state.prospectInfo.name?.split(' ').slice(1).join(' ') || undefined,
+      name: state.prospectInfo.name || undefined,
+      company: state.prospectInfo.company || undefined,
+      title: state.prospectInfo.title,
+      phone: state.prospectInfo.phone,
+      painPoints: painPointEvidence.slice(0, 5),
+      budget: budgetEvidence,
+      timeline: timelineEvidence,
+      qualificationScore: state.qualificationScore,
+      leadScore: state.qualificationScore,
+      summary: qualification.aiAssessment?.summary || undefined,
+      transcript,
+      sessionId: state.sessionId || undefined,
+      conversationDuration: durationMinutes,
+      messageCount: messages.length,
+      tags: reason === 'handoff' ? ['handoff'] : ['qualified'],
+    };
+
+    const result = await createLead(payload, state.workspaceSlug || undefined);
+    if (result.success) {
+      set({ leadCreated: true });
+    } else {
+      console.warn('Lead creation failed:', result.error);
+    }
+  },
+
+  setWorkspaceConfig: (config) => {
+    set(s => {
+      const shouldReplaceWelcome = s.messages.length === 1 && s.messages[0]?.role === 'assistant';
+      const nextMessages = shouldReplaceWelcome
+        ? [{ ...s.messages[0], content: config.messaging.welcomeMessage }]
+        : s.messages;
+
+      return {
+        workspaceConfig: config,
+        messages: nextMessages,
+      };
+    });
+  },
+
+  setWorkspaceSlug: (slug) => {
+    set({ workspaceSlug: slug });
+  },
+
+  setEmbedMode: (embed) => {
+    set({ isEmbedMode: embed });
   },
 
   setProspectInfo: (info: Partial<ProspectInfo>) => {
@@ -339,7 +429,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       messages: [
         {
           id: '1',
-          content: "Hi! I'm here to help you learn about our AI sales platform. What brings you here today?",
+          content: get().workspaceConfig.messaging.welcomeMessage,
           role: 'assistant',
           timestamp: new Date(),
         }
@@ -358,6 +448,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         nameCompany: false,
         demoPricing: false,
       },
+      leadCreated: false,
       error: null,
     });
   },
@@ -426,6 +517,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         nameCompany: true,
         demoPricing: true,
       },
+      leadCreated: false,
       error: null,
     });
   },
@@ -516,6 +608,9 @@ export const useProspectInfo = () => useChatStore(s => s.prospectInfo);
 export const useProspectName = () => useChatStore(s => s.prospectInfo.name);
 export const useQualificationScore = () => useChatStore(s => s.qualificationScore);
 export const useError = () => useChatStore(s => s.error);
+export const useWorkspaceConfig = () => useChatStore(s => s.workspaceConfig);
+export const useWorkspaceSlug = () => useChatStore(s => s.workspaceSlug);
+export const useEmbedMode = () => useChatStore(s => s.isEmbedMode);
 
 // Additional optimized selectors
 export const useSessionId = () => useChatStore(s => s.sessionId);
@@ -530,7 +625,11 @@ export const useChatActions = () =>
   useChatStore(
     useShallow(s => ({
       sendUserMessage: s.sendUserMessage,
+      createLeadFromConversation: s.createLeadFromConversation,
       setProspectInfo: s.setProspectInfo,
+      setWorkspaceConfig: s.setWorkspaceConfig,
+      setWorkspaceSlug: s.setWorkspaceSlug,
+      setEmbedMode: s.setEmbedMode,
       clearChat: s.clearChat,
       loadDemoScenario: s.loadDemoScenario,
     }))

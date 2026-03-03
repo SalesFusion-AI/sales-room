@@ -6,6 +6,8 @@ import { validateMessage } from './utils/validation';
 import { debounce } from './utils/performance';
 import TalkToSalesButton from './components/TalkToSales/TalkToSalesButton';
 import SettingsButton from './components/Settings/SettingsButton';
+import { fetchWorkspaceConfig, DEFAULT_WORKSPACE_CONFIG } from './services/workspaceService';
+import { getWorkspaceSlugFromLocation, isEmbedMode } from './utils/workspace';
 import './App.css';
 
 // Lazy load settings panel for better initial load performance
@@ -72,6 +74,11 @@ function App() {
     isProcessingMessage,
     prospectName,
     error,
+    workspaceConfig,
+    setWorkspaceConfig,
+    setWorkspaceSlug,
+    setEmbedMode,
+    isEmbedMode: embedMode,
   } = useChatStore(
     useShallow(s => ({
       sendUserMessage: s.sendUserMessage,
@@ -80,12 +87,46 @@ function App() {
       isProcessingMessage: s.isProcessingMessage,
       prospectName: s.prospectInfo.name,
       error: s.error,
+      workspaceConfig: s.workspaceConfig,
+      setWorkspaceConfig: s.setWorkspaceConfig,
+      setWorkspaceSlug: s.setWorkspaceSlug,
+      setEmbedMode: s.setEmbedMode,
+      isEmbedMode: s.isEmbedMode,
     }))
   );
   const [inputMessage, setInputMessage] = useState('');
   const [inputError, setInputError] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const slug = getWorkspaceSlugFromLocation();
+    setWorkspaceSlug(slug);
+
+    const embed = isEmbedMode();
+    setEmbedMode(embed);
+    document.body.classList.toggle('embed-mode', embed);
+
+    const loadConfig = async () => {
+      try {
+        const config = await fetchWorkspaceConfig(slug || DEFAULT_WORKSPACE_CONFIG.slug);
+        setWorkspaceConfig(config);
+      } catch (error) {
+        console.warn('Failed to load workspace config, using default.', error);
+        setWorkspaceConfig(DEFAULT_WORKSPACE_CONFIG);
+      }
+    };
+
+    loadConfig();
+  }, [setWorkspaceConfig, setWorkspaceSlug, setEmbedMode]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--brand-primary', workspaceConfig.branding.primaryColor);
+    if (workspaceConfig.branding.secondaryColor) {
+      root.style.setProperty('--brand-secondary', workspaceConfig.branding.secondaryColor);
+    }
+  }, [workspaceConfig]);
 
   // Auto-scroll to bottom with performance optimization
   useEffect(() => {
@@ -179,33 +220,45 @@ function App() {
   ], []);
 
   return (
-    <div className="min-h-screen h-[100svh] text-[var(--text-primary)] flex flex-col overflow-hidden relative z-10">
+    <div className={`min-h-screen h-[100svh] text-[var(--text-primary)] flex flex-col overflow-hidden relative z-10 ${embedMode ? 'embed-container' : ''}`}>
       {/* Header */}
-      <header className="flex-shrink-0 bg-black/80 backdrop-blur-[24px] border-b border-[#222]">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center space-x-3 sm:space-x-4">
-              <div className="w-10 h-10 sm:w-11 sm:h-11 bg-[#111] border border-[#222] rounded-2xl flex items-center justify-center shadow-lg">
-                <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+      {!embedMode && (
+        <header className="flex-shrink-0 bg-black/80 backdrop-blur-[24px] border-b border-[#222]">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center space-x-3 sm:space-x-4">
+                <div className="w-10 h-10 sm:w-11 sm:h-11 bg-[#111] border border-[#222] rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
+                  {workspaceConfig.branding.logoUrl ? (
+                    <img
+                      src={workspaceConfig.branding.logoUrl}
+                      alt={`${workspaceConfig.name} logo`}
+                      className="h-8 w-8 object-contain"
+                    />
+                  ) : (
+                    <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <h1 className="text-lg sm:text-xl font-semibold text-white truncate app-heading font-display">
+                    {workspaceConfig.name} Sales Room
+                  </h1>
+                  <p className="text-xs sm:text-sm text-[var(--text-secondary)]">Your Sales Automation Assistant</p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <h1 className="text-lg sm:text-xl font-semibold text-white truncate app-heading font-display">SalesFusion AI</h1>
-                <p className="text-xs sm:text-sm text-[var(--text-secondary)]">Your Sales Automation Assistant</p>
-              </div>
-            </div>
 
-            <div className="flex items-center gap-3">
-              {/* Prospect info indicator */}
-              {prospectName && <ProspectIndicator name={prospectName} />}
-              <SettingsButton onClick={() => setIsSettingsOpen(true)} />
+              <div className="flex items-center gap-3">
+                {/* Prospect info indicator */}
+                {prospectName && <ProspectIndicator name={prospectName} />}
+                <SettingsButton onClick={() => setIsSettingsOpen(true)} />
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* Main Chat Container */}
-      <div className="flex-1 flex flex-col min-h-0 max-w-4xl mx-auto w-full">
-        <div className="flex-1 flex flex-col glass-panel mx-3 sm:mx-4 my-3 sm:my-4 rounded-2xl sm:rounded-3xl overflow-hidden">
+      <div className={`flex-1 flex flex-col min-h-0 w-full ${embedMode ? 'px-0' : 'max-w-4xl mx-auto'}`}>
+        <div className={`flex-1 flex flex-col glass-panel ${embedMode ? 'mx-0 my-0 rounded-none' : 'mx-3 sm:mx-4 my-3 sm:my-4 rounded-2xl sm:rounded-3xl'} overflow-hidden`}>
 
           {/* Error Banner */}
           {error && (
@@ -238,7 +291,7 @@ function App() {
                   onChange={handleInputChange}
                   onKeyDown={handleKeyDown}
                   maxLength={500}
-                  placeholder="Type your message..."
+                  placeholder={workspaceConfig.messaging.placeholderText}
                   className={`w-full min-h-[44px] glass-input px-4 py-3 placeholder:text-[var(--text-secondary)] ${
                     inputError ? 'border-red-500 focus:border-red-500' : ''
                   }`}
@@ -253,7 +306,11 @@ function App() {
               <button
                 onClick={handleSendMessage}
                 disabled={!inputMessage.trim() || isTyping || isProcessingMessage || !!inputError}
-                className="min-h-[44px] min-w-[44px] bg-white text-black hover:bg-[#f5f5f5] disabled:opacity-40 disabled:cursor-not-allowed px-4 sm:px-6 py-3 rounded-2xl transition-all duration-200 flex items-center justify-center shadow-lg hover:shadow-xl"
+                style={{
+                  backgroundColor: workspaceConfig.branding.primaryColor,
+                  color: '#000000',
+                }}
+                className="min-h-[44px] min-w-[44px] hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed px-4 sm:px-6 py-3 rounded-2xl transition-all duration-200 flex items-center justify-center shadow-lg hover:shadow-xl"
                 aria-label="Send message"
               >
                 <Send className="h-4 w-4" />
@@ -267,7 +324,7 @@ function App() {
                   key={prompt}
                   onClick={() => handlePromptClick(prompt)}
                   disabled={isTyping || isProcessingMessage}
-                  className="min-h-[44px] text-xs sm:text-sm bg-[#111]/70 hover:bg-[#1a1a1a] disabled:opacity-50 text-[var(--text-secondary)] hover:text-white px-3 sm:px-4 py-2.5 rounded-2xl border border-[#222] hover:border-white/20 transition-all duration-200 backdrop-blur-[24px]"
+                  className="min-h-[44px] text-xs sm:text-sm bg-[#111]/70 hover:bg-[#1a1a1a] disabled:opacity-50 text-[var(--text-secondary)] hover:text-white px-3 sm:px-4 py-2.5 rounded-2xl border border-[#222] hover:border-[var(--brand-primary)] transition-all duration-200 backdrop-blur-[24px]"
                 >
                   {prompt}
                 </button>
@@ -277,15 +334,17 @@ function App() {
         </div>
       </div>
 
-      <Suspense fallback={null}>
-        <SettingsPanel
-          isOpen={isSettingsOpen}
-          onClose={() => setIsSettingsOpen(false)}
-        />
-      </Suspense>
+      {!embedMode && (
+        <Suspense fallback={null}>
+          <SettingsPanel
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+          />
+        </Suspense>
+      )}
 
       {/* Talk to Sales floating button - appears when qualification score > 75 */}
-      <TalkToSalesButton />
+      {!embedMode && <TalkToSalesButton />}
     </div>
   );
 }

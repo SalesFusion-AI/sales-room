@@ -82,10 +82,11 @@ const CACHE_TTL = 5000; // 5 seconds
 export async function sendMessage(
   message: string,
   sessionId: string | null,
-  context: ChatContext
+  context: ChatContext,
+  workspaceSlug?: string | null
 ): Promise<ChatResponse> {
   // Create cache key to prevent duplicate requests
-  const cacheKey = `${message}_${sessionId}_${JSON.stringify(context)}`;
+  const cacheKey = `${message}_${sessionId}_${workspaceSlug ?? 'default'}_${JSON.stringify(context)}`;
 
   // Return existing promise if request is already in flight
   if (requestCache.has(cacheKey)) {
@@ -93,7 +94,7 @@ export async function sendMessage(
     return cachedPromise;
   }
 
-  const requestPromise = sendMessageInternal(message, sessionId, context);
+  const requestPromise = sendMessageInternal(message, sessionId, context, workspaceSlug);
 
   // Cache the promise
   requestCache.set(cacheKey, requestPromise);
@@ -110,7 +111,8 @@ export async function sendMessage(
 async function sendMessageInternal(
   message: string,
   sessionId: string | null,
-  context: ChatContext
+  context: ChatContext,
+  workspaceSlug?: string | null
 ): Promise<ChatResponse> {
   const maxRetries = 3;
   let lastError: Error | null = null;
@@ -130,7 +132,11 @@ async function sendMessageInternal(
       let response: Response;
 
       try {
-        response = await fetch(`${API_URL}/api/chat`, {
+        const endpoint = workspaceSlug
+          ? `${API_URL}/api/room/${encodeURIComponent(workspaceSlug)}/chat`
+          : `${API_URL}/api/chat`;
+
+        response = await fetch(endpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -141,6 +147,7 @@ async function sendMessageInternal(
             context,
             model: aiModel,
             apiKey: aiApiKey,
+            workspaceSlug: workspaceSlug || undefined,
           }),
           signal: abortController.signal,
         });
