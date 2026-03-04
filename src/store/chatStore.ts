@@ -21,6 +21,8 @@ interface ProspectInfo {
   name: string;
   company: string;
   email: string;
+  title?: string;
+  phone?: string;
 }
 
 interface ChatStore {
