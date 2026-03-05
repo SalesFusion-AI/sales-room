@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, memo, lazy, Suspense
 import { Send, MessageSquare, User, AlertCircle } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useChatStore } from './store/chatStore';
-import { validateMessage } from './utils/validation';
+import { validateMessage, sanitizeInput } from './utils/validation';
 import { debounce } from './utils/performance';
 import TalkToSalesButton from './components/TalkToSales/TalkToSalesButton';
 import SettingsButton from './components/Settings/SettingsButton';
@@ -85,7 +85,7 @@ function App() {
       messages: s.messages,
       isTyping: s.isTyping,
       isProcessingMessage: s.isProcessingMessage,
-      prospectName: s.prospectInfo.name,
+      prospectName: s.prospectInfo.name ?? '',
       error: s.error,
       workspaceConfig: s.workspaceConfig,
       setWorkspaceConfig: s.setWorkspaceConfig,
@@ -183,8 +183,14 @@ function App() {
     // Prevent sending if already typing or processing
     if (isTyping || isProcessingMessage) return;
 
+    const sanitizedMessage = sanitizeInput(trimmedMessage, 500).trim();
+    if (!sanitizedMessage) {
+      setInputError('Message contains invalid content');
+      return;
+    }
+
     // Final validation before sending
-    const validation = validateMessage(trimmedMessage, { maxLength: 500, minLength: 1 });
+    const validation = validateMessage(sanitizedMessage, { maxLength: 500, minLength: 1 });
     if (!validation.isValid) {
       setInputError(validation.error || 'Invalid message');
       return;
@@ -192,7 +198,7 @@ function App() {
 
     setInputMessage('');
     setInputError(null);
-    await sendUserMessage(trimmedMessage);
+    await sendUserMessage(sanitizedMessage);
   }, [inputMessage, isTyping, isProcessingMessage, sendUserMessage]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -204,9 +210,14 @@ function App() {
 
   const handlePromptClick = useCallback((prompt: string) => {
     if (!isTyping && !isProcessingMessage) {
+      const sanitizedPrompt = sanitizeInput(prompt, 500).trim();
+      if (!sanitizedPrompt) {
+        setInputError('Message contains invalid content');
+        return;
+      }
       setInputMessage('');
       setInputError(null);
-      sendUserMessage(prompt);
+      sendUserMessage(sanitizedPrompt);
     }
   }, [isTyping, isProcessingMessage, sendUserMessage]);
 

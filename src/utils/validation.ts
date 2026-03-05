@@ -369,6 +369,8 @@ export interface ProspectInfo {
   name?: string;
   email?: string;
   company?: string;
+  title?: string;
+  phone?: string;
 }
 
 export function validateProspectInfo(info: ProspectInfo): {
@@ -398,8 +400,86 @@ export function validateProspectInfo(info: ProspectInfo): {
     }
   }
 
+  if (info.title !== undefined) {
+    const titleResult = validateTitle(info.title);
+    if (!titleResult.isValid && titleResult.error) {
+      errors.title = titleResult.error;
+    }
+  }
+
+  if (info.phone !== undefined) {
+    const phoneResult = validatePhone(info.phone);
+    if (!phoneResult.isValid && phoneResult.error) {
+      errors.phone = phoneResult.error;
+    }
+  }
+
   return {
     isValid: Object.keys(errors).length === 0,
     errors
   };
+}
+
+/**
+ * Validate job title
+ */
+export function validateTitle(title: string): ValidationResult {
+  if (!title || !title.trim()) {
+    return { isValid: true };
+  }
+
+  const trimmedTitle = title.trim();
+
+  if (trimmedTitle.length > 100) {
+    return {
+      isValid: false,
+      error: 'Title cannot exceed 100 characters'
+    };
+  }
+
+  const titlePattern = /^[a-zA-Z0-9\s\-&/.,'()]+$/;
+  if (!titlePattern.test(trimmedTitle)) {
+    return {
+      isValid: false,
+      error: 'Title contains invalid characters'
+    };
+  }
+
+  return { isValid: true };
+}
+
+/**
+ * Validate phone number
+ */
+export function validatePhone(phone: string): ValidationResult {
+  if (!phone || !phone.trim()) {
+    return { isValid: true };
+  }
+
+  const trimmedPhone = phone.trim();
+
+  if (trimmedPhone.length > 25) {
+    return {
+      isValid: false,
+      error: 'Phone number is too long'
+    };
+  }
+
+  const phonePattern = /^[0-9+\-().\sxext]+$/i;
+  if (!phonePattern.test(trimmedPhone)) {
+    return {
+      isValid: false,
+      error: 'Phone number contains invalid characters'
+    };
+  }
+
+  const digitCount = trimmedPhone.replace(/\D/g, '').length;
+  if (digitCount < 7 || digitCount > 15) {
+    return {
+      isValid: false,
+      error: 'Phone number length is invalid'
+    };
+  }
+
+  return { isValid: true };
 }

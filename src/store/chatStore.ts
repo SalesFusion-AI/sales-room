@@ -21,6 +21,8 @@ interface ProspectInfo {
   name: string;
   company: string;
   email: string;
+  title: string;
+  phone: string;
 }
 
 interface ChatStore {
@@ -78,6 +80,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     name: '',
     company: '',
     email: '',
+    title: '',
+    phone: '',
   },
   isQualified: false,
   qualificationScore: 0,
@@ -244,6 +248,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       const maxRetries = 2;
 
       while (retryCount <= maxRetries) {
+        if (!isActiveRequest()) return;
         try {
           const { sessionId, context } = buildChatContext();
           response = await sendMessage(sanitizedContent, sessionId, context, get().workspaceSlug);
@@ -264,6 +269,36 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       }
 
       if (!isActiveRequest()) return;
+
+      if (!response.success) {
+        const fallbackResponse = response.response?.trim();
+        const errorMessage = response.error || 'Unable to reach the chat service. Please try again.';
+
+        set(s =>
+          s.activeRequestId === requestId
+            ? {
+                messages: fallbackResponse
+                  ? [
+                      ...s.messages,
+                      {
+                        id: `assistant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                        content: fallbackResponse,
+                        role: 'assistant',
+                        timestamp: new Date(),
+                      },
+                    ]
+                  : s.messages,
+                isTyping: false,
+                isProcessingMessage: false,
+                activeRequestId: null,
+                sessionId: response.sessionId || s.sessionId,
+                error: errorMessage,
+              }
+            : {}
+        );
+
+        return;
+      }
 
       // Add AI response with updated state
       const aiMessage: Message = {
@@ -416,6 +451,17 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       sanitizedInfo.company = sanitizeInput(info.company).substring(0, 100);
     }
 
+    if (info.title !== undefined) {
+      sanitizedInfo.title = sanitizeInput(info.title).substring(0, 100);
+    }
+
+    if (info.phone !== undefined) {
+      const sanitizedPhone = sanitizeInput(info.phone)
+        .replace(/[^\d+().\-\sxext]/gi, '')
+        .substring(0, 25);
+      sanitizedInfo.phone = sanitizedPhone;
+    }
+
     set(s => ({
       prospectInfo: { ...s.prospectInfo, ...sanitizedInfo },
     }));
@@ -447,6 +493,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         painPoint: false,
         nameCompany: false,
         demoPricing: false,
+      },
+      prospectInfo: {
+        name: '',
+        company: '',
+        email: '',
+        title: '',
+        phone: '',
       },
       leadCreated: false,
       error: null,
@@ -506,6 +559,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         name: 'Sarah Chen',
         company: 'TechFlow Solutions',
         email: 'sarah.chen@techflow.com',
+        title: 'VP of Engineering',
+        phone: '',
       },
       isQualified: true,
       qualificationScore: 92,
@@ -531,24 +586,27 @@ function extractProspectInfo(
   // Extract name
   const nameMatch = message.match(/(?:i'm |my name is |i am )([A-Z][a-z]+ ?[A-Z]?[a-z]*)/i);
   if (nameMatch) {
+    const sanitizedName = sanitizeInput(nameMatch[1].trim()).substring(0, 50);
     set(s => ({
-      prospectInfo: { ...s.prospectInfo, name: nameMatch[1].trim() },
+      prospectInfo: { ...s.prospectInfo, name: sanitizedName },
     }));
   }
 
   // Extract company
   const companyMatch = message.match(/(?:work at |work for |company is |at )([A-Z][a-zA-Z0-9 ]+)/i);
   if (companyMatch) {
+    const sanitizedCompany = sanitizeInput(companyMatch[1].trim()).substring(0, 100);
     set(s => ({
-      prospectInfo: { ...s.prospectInfo, company: companyMatch[1].trim() },
+      prospectInfo: { ...s.prospectInfo, company: sanitizedCompany },
     }));
   }
 
   // Extract email
   const emailMatch = message.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
   if (emailMatch) {
+    const sanitizedEmail = sanitizeInput(emailMatch[1]).toLowerCase().substring(0, 254);
     set(s => ({
-      prospectInfo: { ...s.prospectInfo, email: emailMatch[1] },
+      prospectInfo: { ...s.prospectInfo, email: sanitizedEmail },
     }));
   }
 }
