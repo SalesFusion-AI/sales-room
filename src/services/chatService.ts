@@ -94,7 +94,10 @@ export async function sendMessage(
     return cachedPromise;
   }
 
-  const requestPromise = sendMessageInternal(message, sessionId, context, workspaceSlug);
+  const requestPromise = sendMessageInternal(message, sessionId, context, workspaceSlug).catch(error => {
+    console.warn('Chat service request failed, returning fallback response.', error);
+    return buildFailureResponse(error, sessionId);
+  });
 
   // Cache the promise
   requestCache.set(cacheKey, requestPromise);
@@ -106,6 +109,36 @@ export async function sendMessage(
   setTimeout(cleanup, CACHE_TTL);
 
   return requestPromise;
+}
+
+function buildFailureResponse(error: unknown, sessionId: string | null): ChatResponse {
+  const resolvedSessionId = sessionId || `error_${Date.now()}`;
+  const fallbackResponse = getUserFriendlyMessage(error);
+
+  return {
+    success: false,
+    response: fallbackResponse,
+    sessionId: resolvedSessionId,
+    error: error instanceof Error ? error.message : 'Unknown error',
+  };
+}
+
+function getUserFriendlyMessage(error: unknown): string {
+  if (error instanceof ChatServiceError) {
+    switch (error.kind) {
+      case 'network':
+      case 'timeout':
+        return "I'm having trouble connecting right now. Please try again in a moment.";
+      case 'api':
+        return 'The chat service is temporarily unavailable. Please try again shortly.';
+      case 'invalid_response':
+        return "I received an unexpected response. Please try again in a moment.";
+      default:
+        return 'Something went wrong while processing your request. Please try again.';
+    }
+  }
+
+  return 'Something went wrong while processing your request. Please try again.';
 }
 
 async function sendMessageInternal(

@@ -40,10 +40,14 @@ describe('validation utilities', () => {
       name: 'A',
       email: 'bad-email',
       company: 'Acme',
+      title: 'VP <script>',
+      phone: '123',
     });
     expect(result.isValid).toBe(false);
     expect(result.errors.name).toBeDefined();
     expect(result.errors.email).toBeDefined();
     expect(result.errors.company).toBeUndefined();
+    expect(result.errors.title).toBeDefined();
+    expect(result.errors.phone).toBeDefined();
   });
 });
