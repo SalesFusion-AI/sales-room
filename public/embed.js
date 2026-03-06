@@ -33,7 +33,7 @@
 
     scriptTag.parentNode.insertBefore(iframe, scriptTag.nextSibling);
   } catch (error) {
-    // eslint-disable-next-line no-console
+     
     console.error('SalesFusion embed failed:', error);
   }
 })();
