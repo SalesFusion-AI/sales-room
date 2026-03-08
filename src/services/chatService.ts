@@ -3,7 +3,7 @@
  */
 
 import { useSettingsStore } from '../store/settingsStore';
-import { validateMessage, sanitizeInput } from '../utils/validation';
+import { sanitizeInput, validateMessage } from '../utils/validation';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 

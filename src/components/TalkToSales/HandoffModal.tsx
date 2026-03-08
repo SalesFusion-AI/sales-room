@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { X, PhoneCall, Calendar, UserCheck } from 'lucide-react';
-import { useChatStore } from '../../store/chatStore';
+import { useChatStore, useQualificationScore } from '../../store/chatStore';
+import { notifyHandoffReady } from '../../services/slackService';
 import { sanitizeInput, validateUrl } from '../../utils/validation';
 
 type RepStatus = 'available' | 'busy' | 'offline';
@@ -30,7 +31,8 @@ export default function HandoffModal({ open, onClose }: HandoffModalProps) {
   const [calendlyLink, setCalendlyLink] = useState('https://calendly.com/salesfusion');
   const [calendlyError, setCalendlyError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
-  const createLeadFromConversation = useChatStore(s => s.createLeadFromConversation);
+  const prospectInfo = useChatStore(s => s.prospectInfo);
+  const qualificationScore = useQualificationScore();
 
   const showSchedule = status !== 'available';
   const statusBadge = useMemo(() => statusStyles[status], [status]);
@@ -105,7 +107,13 @@ export default function HandoffModal({ open, onClose }: HandoffModalProps) {
               <button 
                 onClick={async () => {
                   setConnecting(true);
-                  await createLeadFromConversation('handoff');
+                  // Notify sales team via Slack
+                  await notifyHandoffReady(
+                    prospectInfo.name,
+                    prospectInfo.company,
+                    prospectInfo.email,
+                    qualificationScore
+                  );
                   // In production, this would initiate a real connection
                   // For now, show confirmation
                   setTimeout(() => {

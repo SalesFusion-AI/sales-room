@@ -11,7 +11,7 @@ import {
   useWorkspaceConfig,
   useEmbedMode,
 } from './store/chatStore';
-import { validateMessage, sanitizeInput } from './utils/validation';
+import { sanitizeInput, validateMessage } from './utils/validation';
 import { debounce } from './utils/performance';
 import TalkToSalesButton from './components/TalkToSales/TalkToSalesButton';
 import SettingsButton from './components/Settings/SettingsButton';
@@ -75,7 +75,6 @@ const ProspectIndicator = memo(({ name }: { name: string }) => (
 ProspectIndicator.displayName = 'ProspectIndicator';
 
 function App() {
-  // Use a single shallow selector to prevent unnecessary re-renders
   const sendUserMessage = useSendUserMessage();
   const messages = useMessages();
   const isTyping = useIsTyping();
