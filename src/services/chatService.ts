@@ -3,6 +3,7 @@
  */
 
 import { useSettingsStore } from '../store/settingsStore';
+import { sanitizeInput, validateMessage } from '../utils/validation';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -85,8 +86,15 @@ export async function sendMessage(
   context: ChatContext,
   workspaceSlug?: string | null
 ): Promise<ChatResponse> {
+  const validation = validateMessage(message, { maxLength: 500, minLength: 1 });
+  if (!validation.isValid) {
+    return buildFailureResponse(new InvalidResponseError(validation.error || 'Invalid message'), sessionId);
+  }
+
+  const sanitizedMessage = sanitizeInput(message, 500).trim();
+
   // Create cache key to prevent duplicate requests
-  const cacheKey = `${message}_${sessionId}_${workspaceSlug ?? 'default'}_${JSON.stringify(context)}`;
+  const cacheKey = `${sanitizedMessage}_${sessionId}_${workspaceSlug ?? 'default'}_${JSON.stringify(context)}`;
 
   // Return existing promise if request is already in flight
   if (requestCache.has(cacheKey)) {
@@ -94,7 +102,7 @@ export async function sendMessage(
     return cachedPromise;
   }
 
-  const requestPromise = sendMessageInternal(message, sessionId, context, workspaceSlug).catch(error => {
+  const requestPromise = sendMessageInternal(sanitizedMessage, sessionId, context, workspaceSlug).catch(error => {
     console.warn('Chat service request failed, returning fallback response.', error);
     return buildFailureResponse(error, sessionId);
   });
@@ -307,6 +315,20 @@ async function sendMessageInternal(
 
       // Validate response structure
       const chatResponse = data as ChatResponse;
+      if (chatResponse.success === false && !chatResponse.response) {
+        lastError = new ApiError(
+          `Chat service returned an error (attempt ${attempt}/${maxRetries})`,
+          response.status,
+          chatResponse.error || 'Chat service error'
+        );
+
+        if (attempt === maxRetries) {
+          throw lastError;
+        }
+        await delay(Math.pow(2, attempt - 1) * 1000);
+        continue;
+      }
+
       if (!chatResponse.response || typeof chatResponse.response !== 'string') {
         lastError = new InvalidResponseError(
           `Invalid response structure from chat service (attempt ${attempt}/${maxRetries})`,

@@ -17,6 +17,7 @@ import {
 import { transcriptService, type StoredConversation, type LeadTag } from '../../services/transcriptService';
 import { crmService } from '../../services/crmService';
 import TranscriptViewer from './TranscriptViewer';
+import { sanitizeInput } from '../../utils/validation';
 
 interface TranscriptListProps {
   onConversationSelect?: (conversation: StoredConversation) => void;
@@ -266,7 +267,7 @@ const TranscriptList: React.FC<TranscriptListProps> = ({
               type="text"
               placeholder="Search conversations, prospects, companies..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => setSearchTerm(sanitizeInput(e.target.value, 120))}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>

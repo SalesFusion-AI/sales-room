@@ -1,8 +1,17 @@
 import { useState, useRef, useEffect, useCallback, useMemo, memo, lazy, Suspense } from 'react';
 import { Send, MessageSquare, User, AlertCircle } from 'lucide-react';
-import { useShallow } from 'zustand/react/shallow';
-import { useChatStore } from './store/chatStore';
-import { validateMessage, sanitizeInput } from './utils/validation';
+import {
+  useChatActions,
+  useSendUserMessage,
+  useMessages,
+  useIsTyping,
+  useIsProcessingMessage,
+  useProspectName,
+  useError,
+  useWorkspaceConfig,
+  useEmbedMode,
+} from './store/chatStore';
+import { sanitizeInput, validateMessage } from './utils/validation';
 import { debounce } from './utils/performance';
 import TalkToSalesButton from './components/TalkToSales/TalkToSalesButton';
 import SettingsButton from './components/Settings/SettingsButton';
@@ -66,34 +75,15 @@ const ProspectIndicator = memo(({ name }: { name: string }) => (
 ProspectIndicator.displayName = 'ProspectIndicator';
 
 function App() {
-  // Use a single shallow selector to prevent unnecessary re-renders
-  const {
-    sendUserMessage,
-    messages,
-    isTyping,
-    isProcessingMessage,
-    prospectName,
-    error,
-    workspaceConfig,
-    setWorkspaceConfig,
-    setWorkspaceSlug,
-    setEmbedMode,
-    isEmbedMode: embedMode,
-  } = useChatStore(
-    useShallow(s => ({
-      sendUserMessage: s.sendUserMessage,
-      messages: s.messages,
-      isTyping: s.isTyping,
-      isProcessingMessage: s.isProcessingMessage,
-      prospectName: s.prospectInfo.name ?? '',
-      error: s.error,
-      workspaceConfig: s.workspaceConfig,
-      setWorkspaceConfig: s.setWorkspaceConfig,
-      setWorkspaceSlug: s.setWorkspaceSlug,
-      setEmbedMode: s.setEmbedMode,
-      isEmbedMode: s.isEmbedMode,
-    }))
-  );
+  const sendUserMessage = useSendUserMessage();
+  const messages = useMessages();
+  const isTyping = useIsTyping();
+  const isProcessingMessage = useIsProcessingMessage();
+  const prospectName = useProspectName();
+  const error = useError();
+  const workspaceConfig = useWorkspaceConfig();
+  const embedMode = useEmbedMode();
+  const { setWorkspaceConfig, setWorkspaceSlug, setEmbedMode } = useChatActions();
   const [inputMessage, setInputMessage] = useState('');
   const [inputError, setInputError] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);

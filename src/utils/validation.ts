@@ -483,3 +483,97 @@ export function validatePhone(phone: string): ValidationResult {
 
   return { isValid: true };
 }
+
+/**
+ * Validate URLs (http/https)
+ */
+export function validateUrl(
+  url: string,
+  options: { required?: boolean; maxLength?: number; protocols?: string[] } = {}
+): ValidationResult {
+  const { required = false, maxLength = 2048, protocols = ['http:', 'https:'] } = options;
+
+  if (!url || !url.trim()) {
+    if (required) {
+      return { isValid: false, error: 'URL is required' };
+    }
+    return { isValid: true };
+  }
+
+  const trimmed = url.trim();
+  if (trimmed.length > maxLength) {
+    return { isValid: false, error: 'URL is too long' };
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (!protocols.includes(parsed.protocol)) {
+      return { isValid: false, error: 'URL must start with http or https' };
+    }
+    return { isValid: true };
+  } catch {
+    return { isValid: false, error: 'Please enter a valid URL' };
+  }
+}
+
+/**
+ * Validate hex color strings
+ */
+export function validateHexColor(color: string): ValidationResult {
+  if (!color || !color.trim()) {
+    return { isValid: false, error: 'Color is required' };
+  }
+
+  const trimmed = color.trim();
+  if (!/^#(?:[0-9a-fA-F]{3}){1,2}$/.test(trimmed)) {
+    return { isValid: false, error: 'Please enter a valid hex color (e.g., #3b82f6)' };
+  }
+
+  return { isValid: true };
+}
+
+/**
+ * Validate custom domains
+ */
+export function validateDomain(domain: string): ValidationResult {
+  if (!domain || !domain.trim()) {
+    return { isValid: true };
+  }
+
+  const trimmed = domain.trim();
+  if (trimmed.length > 253) {
+    return { isValid: false, error: 'Domain is too long' };
+  }
+
+  const domainPattern = /^(?!-)(?:[a-zA-Z0-9-]{1,63}\.)+[a-zA-Z]{2,}$/;
+  if (!domainPattern.test(trimmed)) {
+    return { isValid: false, error: 'Please enter a valid domain (e.g., sales.example.com)' };
+  }
+
+  return { isValid: true };
+}
+
+/**
+ * Validate API keys (basic whitespace/length check)
+ */
+export function validateApiKey(key: string, options: { required?: boolean; maxLength?: number } = {}): ValidationResult {
+  const { required = false, maxLength = 200 } = options;
+
+  if (!key || !key.trim()) {
+    if (required) {
+      return { isValid: false, error: 'API key is required' };
+    }
+    return { isValid: true };
+  }
+
+  const trimmed = key.trim();
+  if (trimmed.length > maxLength) {
+    return { isValid: false, error: 'API key is too long' };
+  }
+
+  if (/\s/.test(trimmed)) {
+    return { isValid: false, error: 'API key cannot contain spaces' };
+  }
+
+  return { isValid: true };
+}
