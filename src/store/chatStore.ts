@@ -147,7 +147,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       );
 
       // Extract prospect info early from user message
-      extractProspectInfo(sanitizedContent, set);
+      extractProspectInfo(sanitizedContent, set, requestId);
 
       const updateQualificationStatus = async (options?: { messageContent?: string; demoMode?: boolean }) => {
         try {
@@ -397,9 +397,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       tags: reason === 'handoff' ? ['handoff'] : ['qualified'],
     };
 
+    const currentSessionId = state.sessionId;
     const result = await createLead(payload, state.workspaceSlug || undefined);
     if (result.success) {
-      set({ leadCreated: true });
+      set(s => (s.sessionId === currentSessionId ? { leadCreated: true } : {}));
     } else {
       console.warn('Lead creation failed:', result.error);
     }
@@ -581,33 +582,46 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 // Helper to extract prospect info from messages
 function extractProspectInfo(
   message: string,
-  set: (fn: (s: ChatStore) => Partial<ChatStore>) => void
+  set: (fn: (s: ChatStore) => Partial<ChatStore>) => void,
+  requestId: string
 ) {
   // Extract name
   const nameMatch = message.match(/(?:i'm |my name is |i am )([A-Z][a-z]+ ?[A-Z]?[a-z]*)/i);
   if (nameMatch) {
     const sanitizedName = sanitizeInput(nameMatch[1].trim()).substring(0, 50);
-    set(s => ({
-      prospectInfo: { ...s.prospectInfo, name: sanitizedName },
-    }));
+    set(s =>
+      s.activeRequestId === requestId
+        ? {
+            prospectInfo: { ...s.prospectInfo, name: sanitizedName },
+          }
+        : {}
+    );
   }
 
   // Extract company
   const companyMatch = message.match(/(?:work at |work for |company is |at )([A-Z][a-zA-Z0-9 ]+)/i);
   if (companyMatch) {
     const sanitizedCompany = sanitizeInput(companyMatch[1].trim()).substring(0, 100);
-    set(s => ({
-      prospectInfo: { ...s.prospectInfo, company: sanitizedCompany },
-    }));
+    set(s =>
+      s.activeRequestId === requestId
+        ? {
+            prospectInfo: { ...s.prospectInfo, company: sanitizedCompany },
+          }
+        : {}
+    );
   }
 
   // Extract email
   const emailMatch = message.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
   if (emailMatch) {
     const sanitizedEmail = sanitizeInput(emailMatch[1]).toLowerCase().substring(0, 254);
-    set(s => ({
-      prospectInfo: { ...s.prospectInfo, email: sanitizedEmail },
-    }));
+    set(s =>
+      s.activeRequestId === requestId
+        ? {
+            prospectInfo: { ...s.prospectInfo, email: sanitizedEmail },
+          }
+        : {}
+    );
   }
 }
 
