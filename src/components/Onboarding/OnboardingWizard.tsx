@@ -16,6 +16,7 @@ import {
   Building
 } from 'lucide-react';
 import { demoService } from '../../demo/demoService';
+import { sanitizeInput, validateCompany, validateUrl, validateHexColor, validateDomain } from '../../utils/validation';
 
 interface OnboardingStep {
   id: string;
@@ -107,6 +108,7 @@ const OnboardingWizard: React.FC = () => {
   });
   
   const [isDemo] = useState(() => demoService.isDemoActive());
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
 
   // Demo initialization handled in useState above
 
@@ -196,6 +198,60 @@ const OnboardingWizard: React.FC = () => {
     setCurrentStep(stepIndex);
   };
 
+  const updateError = (field: string, error?: string) => {
+    setErrors(prev => ({ ...prev, [field]: error || null }));
+  };
+
+  const handleCompanyNameChange = (value: string) => {
+    const sanitized = sanitizeInput(value, 100);
+    const validation = validateCompany(sanitized);
+    updateError('companyName', validation.isValid ? undefined : validation.error);
+    setConfig(prev => ({
+      ...prev,
+      company: { ...prev.company, name: sanitized },
+    }));
+  };
+
+  const handleWebsiteChange = (value: string) => {
+    const sanitized = sanitizeInput(value, 2048).trim();
+    const validation = validateUrl(sanitized, { required: false });
+    updateError('companyWebsite', validation.isValid ? undefined : validation.error);
+    setConfig(prev => ({
+      ...prev,
+      company: { ...prev.company, website: sanitized },
+    }));
+  };
+
+  const handlePrimaryColorChange = (value: string) => {
+    const sanitized = sanitizeInput(value, 20);
+    const validation = validateHexColor(sanitized);
+    updateError('primaryColor', validation.isValid ? undefined : validation.error);
+    setConfig(prev => ({
+      ...prev,
+      branding: { ...prev.branding, primaryColor: sanitized },
+    }));
+  };
+
+  const handleSecondaryColorChange = (value: string) => {
+    const sanitized = sanitizeInput(value, 20);
+    const validation = validateHexColor(sanitized);
+    updateError('secondaryColor', validation.isValid ? undefined : validation.error);
+    setConfig(prev => ({
+      ...prev,
+      branding: { ...prev.branding, secondaryColor: sanitized },
+    }));
+  };
+
+  const handleDomainChange = (value: string) => {
+    const sanitized = sanitizeInput(value, 253).toLowerCase();
+    const validation = validateDomain(sanitized);
+    updateError('customDomain', validation.isValid ? undefined : validation.error);
+    setConfig(prev => ({
+      ...prev,
+      domain: { ...prev.domain, customDomain: sanitized },
+    }));
+  };
+
   const renderStepContent = () => {
     const step = steps[currentStep];
 
@@ -208,13 +264,13 @@ const OnboardingWizard: React.FC = () => {
               <input
                 type="text"
                 value={config.company.name}
-                onChange={(e) => setConfig({
-                  ...config,
-                  company: { ...config.company, name: e.target.value }
-                })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onChange={(e) => handleCompanyNameChange(e.target.value)}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.companyName ? 'border-red-500 focus:border-red-500' : ''}`}
                 placeholder="Enter your company name"
               />
+              {errors.companyName && (
+                <p className="text-xs text-red-600 mt-1">{errors.companyName}</p>
+              )}
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -264,13 +320,13 @@ const OnboardingWizard: React.FC = () => {
               <input
                 type="url"
                 value={config.company.website}
-                onChange={(e) => setConfig({
-                  ...config,
-                  company: { ...config.company, website: e.target.value }
-                })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onChange={(e) => handleWebsiteChange(e.target.value)}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.companyWebsite ? 'border-red-500 focus:border-red-500' : ''}`}
                 placeholder="https://your-company.com"
               />
+              {errors.companyWebsite && (
+                <p className="text-xs text-red-600 mt-1">{errors.companyWebsite}</p>
+              )}
             </div>
           </div>
         );
@@ -303,22 +359,19 @@ const OnboardingWizard: React.FC = () => {
                   <input
                     type="color"
                     value={config.branding.primaryColor}
-                    onChange={(e) => setConfig({
-                      ...config,
-                      branding: { ...config.branding, primaryColor: e.target.value }
-                    })}
+                    onChange={(e) => handlePrimaryColorChange(e.target.value)}
                     className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
                   />
                   <input
                     type="text"
                     value={config.branding.primaryColor}
-                    onChange={(e) => setConfig({
-                      ...config,
-                      branding: { ...config.branding, primaryColor: e.target.value }
-                    })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    onChange={(e) => handlePrimaryColorChange(e.target.value)}
+                    className={`flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.primaryColor ? 'border-red-500 focus:border-red-500' : ''}`}
                   />
                 </div>
+                {errors.primaryColor && (
+                  <p className="text-xs text-red-600 mt-1">{errors.primaryColor}</p>
+                )}
               </div>
               
               <div>
@@ -327,22 +380,19 @@ const OnboardingWizard: React.FC = () => {
                   <input
                     type="color"
                     value={config.branding.secondaryColor}
-                    onChange={(e) => setConfig({
-                      ...config,
-                      branding: { ...config.branding, secondaryColor: e.target.value }
-                    })}
+                    onChange={(e) => handleSecondaryColorChange(e.target.value)}
                     className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
                   />
                   <input
                     type="text"
                     value={config.branding.secondaryColor}
-                    onChange={(e) => setConfig({
-                      ...config,
-                      branding: { ...config.branding, secondaryColor: e.target.value }
-                    })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    onChange={(e) => handleSecondaryColorChange(e.target.value)}
+                    className={`flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.secondaryColor ? 'border-red-500 focus:border-red-500' : ''}`}
                   />
                 </div>
+                {errors.secondaryColor && (
+                  <p className="text-xs text-red-600 mt-1">{errors.secondaryColor}</p>
+                )}
               </div>
             </div>
 
@@ -653,17 +703,17 @@ const OnboardingWizard: React.FC = () => {
                     <input
                       type="text"
                       value={config.domain.customDomain}
-                      onChange={(e) => setConfig({
-                        ...config,
-                        domain: { ...config.domain, customDomain: e.target.value }
-                      })}
+                      onChange={(e) => handleDomainChange(e.target.value)}
                       placeholder="sales.yourcompany.com"
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className={`flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.customDomain ? 'border-red-500 focus:border-red-500' : ''}`}
                     />
                     <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors">
                       Verify
                     </button>
                   </div>
+                  {errors.customDomain && (
+                    <p className="text-xs text-red-600 mt-1">{errors.customDomain}</p>
+                  )}
                 </div>
 
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">

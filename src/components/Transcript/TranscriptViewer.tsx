@@ -19,6 +19,9 @@ import {
 } from 'lucide-react';
 import type { StoredConversation, TranscriptSummary } from '../../types';
 import { transcriptService } from '../../services/transcriptService';
+import { sanitizeInput } from '../../utils/validation';
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 interface TranscriptViewerProps {
   sessionId?: string;
@@ -412,7 +415,7 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
                 type="text"
                 placeholder="Search messages..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => setSearchTerm(sanitizeInput(e.target.value, 120))}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
@@ -451,7 +454,7 @@ const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
                   <div className="whitespace-pre-wrap break-words">
                     {highlightedMessages.has(message.id) && searchTerm ? 
                       message.content.replace(
-                        new RegExp(searchTerm, 'gi'), 
+                        new RegExp(escapeRegExp(searchTerm), 'gi'), 
                         `<mark class="bg-yellow-300">$&</mark>`
                       ) : message.content
                     }

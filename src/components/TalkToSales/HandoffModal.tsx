@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { X, PhoneCall, Calendar, UserCheck } from 'lucide-react';
-import { useChatStore } from '../../store/chatStore';
+import { useChatStore, useQualificationScore } from '../../store/chatStore';
+import { notifyHandoffReady } from '../../services/slackService';
+import { sanitizeInput, validateUrl } from '../../utils/validation';
 
 type RepStatus = 'available' | 'busy' | 'offline';
 
@@ -27,11 +29,22 @@ const statusStyles: Record<RepStatus, { label: string; className: string }> = {
 export default function HandoffModal({ open, onClose }: HandoffModalProps) {
   const [status, setStatus] = useState<RepStatus>('available');
   const [calendlyLink, setCalendlyLink] = useState('https://calendly.com/salesfusion');
+  const [calendlyError, setCalendlyError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
-  const createLeadFromConversation = useChatStore(s => s.createLeadFromConversation);
+  const prospectInfo = useChatStore(s => s.prospectInfo);
+  const qualificationScore = useQualificationScore();
 
   const showSchedule = status !== 'available';
   const statusBadge = useMemo(() => statusStyles[status], [status]);
+
+  const handleCalendlyChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextValue = sanitizeInput(event.target.value, 2048).trim();
+    setCalendlyLink(nextValue);
+    const validation = validateUrl(nextValue, { required: false });
+    setCalendlyError(validation.isValid ? null : validation.error || 'Invalid URL');
+  };
+
+  const calendlyLinkValid = !calendlyError && !!calendlyLink;
 
   if (!open) return null;
 
@@ -94,7 +107,13 @@ export default function HandoffModal({ open, onClose }: HandoffModalProps) {
               <button 
                 onClick={async () => {
                   setConnecting(true);
-                  await createLeadFromConversation('handoff');
+                  // Notify sales team via Slack
+                  await notifyHandoffReady(
+                    prospectInfo.name,
+                    prospectInfo.company,
+                    prospectInfo.email,
+                    qualificationScore
+                  );
                   // In production, this would initiate a real connection
                   // For now, show confirmation
                   setTimeout(() => {
@@ -123,13 +142,16 @@ export default function HandoffModal({ open, onClose }: HandoffModalProps) {
                 <input
                   type="url"
                   value={calendlyLink}
-                  onChange={(event) => setCalendlyLink(event.target.value)}
+                  onChange={handleCalendlyChange}
                   placeholder="https://calendly.com/salesfusion"
-                  className="w-full rounded-2xl border border-[#222] bg-[#111] px-4 py-3 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-white/10"
+                  className={`w-full rounded-2xl border border-[#222] bg-[#111] px-4 py-3 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-white/10 ${calendlyError ? 'border-red-500 focus:border-red-500' : ''}`}
                 />
+                {calendlyError && (
+                  <span className="text-xs text-red-400">{calendlyError}</span>
+                )}
               </label>
 
-              {calendlyLink && (
+              {calendlyLinkValid && (
                 <div className="overflow-hidden rounded-2xl border border-[#222]">
                   <iframe
                     title="Schedule a Call"
@@ -140,10 +162,10 @@ export default function HandoffModal({ open, onClose }: HandoffModalProps) {
               )}
 
               <a
-                href={calendlyLink}
+                href={calendlyLinkValid ? calendlyLink : '#'}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded-2xl border border-[#222] bg-[#111] px-4 py-2 text-sm text-gray-200 transition hover:border-white/20 hover:text-white"
+                className={`inline-flex items-center gap-2 rounded-2xl border border-[#222] bg-[#111] px-4 py-2 text-sm text-gray-200 transition hover:border-white/20 hover:text-white ${!calendlyLinkValid ? 'pointer-events-none opacity-50' : ''}`}
               >
                 <Calendar className="h-4 w-4" />
                 Schedule a Call

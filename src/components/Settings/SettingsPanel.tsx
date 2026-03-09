@@ -2,6 +2,7 @@ import React, { useEffect, useState, memo, useCallback, useMemo } from 'react';
 import { X, CheckCircle2, AlertCircle, Play } from 'lucide-react';
 import { useAiModel, useAiApiKey, useSettingsActions } from '../../store/settingsStore';
 import { useLoadDemoScenario } from '../../store/chatStore';
+import { sanitizeInput, validateApiKey } from '../../utils/validation';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -25,6 +26,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
   const [draftModel, setDraftModel] = useState(aiModel);
   const [draftKey, setDraftKey] = useState(aiApiKey);
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [apiKeyError, setApiKeyError] = useState<string | null>(null);
   const [isTesting, setIsTesting] = useState(false);
   const [isLoadingDemo, setIsLoadingDemo] = useState(false);
 
@@ -33,18 +35,32 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
       setDraftModel(aiModel);
       setDraftKey(aiApiKey);
       setStatus(null);
+      setApiKeyError(null);
     }
   }, [isOpen, aiModel, aiApiKey]);
 
   const handleSave = useCallback(() => {
+    const validation = validateApiKey(draftKey, { required: false });
+    if (!validation.isValid) {
+      setApiKeyError(validation.error || 'Invalid API key');
+      return;
+    }
+
     setAiModel(draftModel);
-    setApiKey(draftKey);
+    setApiKey(draftKey.trim());
     setStatus({ type: 'success', message: 'Settings saved to your browser.' });
   }, [draftModel, draftKey, setAiModel, setApiKey]);
 
   const handleTestConnection = useCallback(async () => {
     setIsTesting(true);
     setStatus(null);
+
+    const validation = validateApiKey(draftKey, { required: false });
+    if (!validation.isValid) {
+      setApiKeyError(validation.error || 'Invalid API key');
+      setIsTesting(false);
+      return;
+    }
 
     try {
       const response = await fetch(`${API_URL}/api/chat`, {
@@ -57,7 +73,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
           sessionId: null,
           context: {},
           model: draftModel,
-          apiKey: draftKey,
+          apiKey: draftKey.trim(),
         }),
       });
 
@@ -74,6 +90,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
       setIsTesting(false);
     }
   }, [draftModel, draftKey]);
+
+  const handleKeyChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const cleaned = sanitizeInput(event.target.value, 200);
+    setDraftKey(cleaned);
+    const validation = validateApiKey(cleaned, { required: false });
+    setApiKeyError(validation.isValid ? null : validation.error || 'Invalid API key');
+  }, []);
 
   const handleLoadDemo = useCallback(async () => {
     setIsLoadingDemo(true);
@@ -151,11 +174,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
             <input
               type="password"
               value={draftKey}
-              onChange={(event) => setDraftKey(event.target.value)}
+              onChange={handleKeyChange}
               placeholder="sk-..."
-              className="w-full rounded-xl border border-[#222] bg-[#111] px-4 py-3 text-sm text-gray-100 placeholder:text-gray-500 focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-white/10"
+              className={`w-full rounded-xl border border-[#222] bg-[#111] px-4 py-3 text-sm text-gray-100 placeholder:text-gray-500 focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-white/10 ${apiKeyError ? 'border-red-500 focus:border-red-500' : ''}`}
             />
-            <p className="text-xs text-gray-500">Stored locally in your browser.</p>
+            {apiKeyError ? (
+              <p className="text-xs text-red-400">{apiKeyError}</p>
+            ) : (
+              <p className="text-xs text-gray-500">Stored locally in your browser.</p>
+            )}
           </div>
 
           {status && (
@@ -185,7 +212,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
           <button
             type="button"
             onClick={handleTestConnection}
-            disabled={isTesting}
+            disabled={isTesting || !!apiKeyError}
             className="w-full rounded-xl border border-[#222] bg-[#111] px-4 py-3 text-sm font-medium text-gray-200 transition hover:border-white/20 hover:bg-[#1a1a1a] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isTesting ? 'Testing connection...' : 'Test connection'}
@@ -193,7 +220,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
           <button
             type="button"
             onClick={handleSave}
-            className="w-full rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black shadow-lg transition hover:bg-[#f5f5f5]"
+            disabled={!!apiKeyError}
+            className="w-full rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black shadow-lg transition hover:bg-[#f5f5f5] disabled:opacity-60 disabled:cursor-not-allowed"
           >
             Save settings
           </button>
